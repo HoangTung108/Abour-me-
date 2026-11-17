@@ -216,3 +216,4 @@ node_modules/vite/types/metadata.d.ts
 node_modules/vite/types/package.json
 node_modules/vite/types/internal/cssPreprocessorOptions.d.ts
 node_modules/vite/types/internal/lightningcssOptions.d.ts
+node_modules
