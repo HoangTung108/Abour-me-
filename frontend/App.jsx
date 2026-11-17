@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Float, Sparkles, Stars } from "@react-three/drei";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowDown, ArrowUpRight, GitBranch, Orbit, Sparkles as SparkleIcon, Star } from "lucide-react";
-import { AdditiveBlending, BufferGeometry, CanvasTexture, Color, Float32BufferAttribute, SRGBColorSpace } from "three";
+import { ArrowUpRight, GitBranch, Orbit, Star } from "lucide-react";
+import { AdditiveBlending, BufferGeometry, CanvasTexture, Float32BufferAttribute } from "three";
 
 const GITHUB_USERNAME = "HoangTung108";
-const STAR_COLORS = ["#a9eaff", "#c0aaff", "#ff9bd1", "#e0d4ff"];
+const STAR_COLOR = "#c5e8ff";
+const ignoreRaycast = () => null;
+const MAX_INTERACTIVE_STARS = 1000;
 
 function seededRandom(seed) {
   let value = seed >>> 0;
@@ -20,46 +21,37 @@ function gaussian(random) {
   return Math.sqrt(-2 * Math.log(Math.max(random(), 0.0001))) * Math.cos(2 * Math.PI * random());
 }
 
-function GalaxyDust() {
+function GalaxyDust({ lowPower }) {
   const geometry = useMemo(() => {
-    const count = 16000;
+    const count = lowPower ? 1400 : 3600;
     const positions = new Float32Array(count * 3);
-    const colors = new Float32Array(count * 3);
     const random = seededRandom(108);
-    const palette = [new Color("#d9e8ff"), new Color("#aec8ff"), new Color("#a999e7"), new Color("#f0bedf")];
     const angle = 0.39;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
 
     for (let index = 0; index < count; index += 1) {
-      const along = (random() * 2 - 1) * 13.2;
-      const cross = gaussian(random) * (0.62 + random() * 0.48) + Math.sin(along * 0.53) * 0.18;
+      const along = (random() * 2 - 1) * 17.5;
+      const across = gaussian(random) * (0.8 + random() * 0.6) + Math.sin(along * 0.31) * 0.25;
       const offset = index * 3;
-      const color = palette[Math.floor(random() * palette.length)].clone();
-      const brightness = Math.max(0.35, 1 - Math.abs(cross) * 0.22) * (0.66 + random() * 0.55);
-
-      positions[offset] = along * cos - cross * sin;
-      positions[offset + 1] = along * sin + cross * cos;
-      positions[offset + 2] = (random() - 0.5) * 0.9;
-      colors[offset] = color.r * brightness;
-      colors[offset + 1] = color.g * brightness;
-      colors[offset + 2] = color.b * brightness;
+      positions[offset] = along * cos - across * sin;
+      positions[offset + 1] = along * sin + across * cos;
+      positions[offset + 2] = (random() - 0.5) * 0.6;
     }
 
     const result = new BufferGeometry();
     result.setAttribute("position", new Float32BufferAttribute(positions, 3));
-    result.setAttribute("color", new Float32BufferAttribute(colors, 3));
     return result;
-  }, []);
+  }, [lowPower]);
 
   return (
     <points geometry={geometry} rotation={[0.02, -0.08, 0]}>
       <pointsMaterial
-        size={0.024}
+        size={0.028}
         sizeAttenuation
         transparent
-        opacity={0.78}
-        vertexColors
+        opacity={0.34}
+        color="#a8c9f3"
         blending={AdditiveBlending}
         depthWrite={false}
       />
@@ -67,66 +59,63 @@ function GalaxyDust() {
   );
 }
 
-function MilkyWayCloud() {
-  const texture = useMemo(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 1536;
-    canvas.height = 640;
-    const context = canvas.getContext("2d");
-    const random = seededRandom(731);
-    const band = context.createLinearGradient(0, 0, 0, canvas.height);
+function createConstellations(repositories, viewport, seed) {
+  const random = seededRandom(seed);
+  const clusterCount = Math.ceil(repositories.length / 4);
+  const clusterRadius = Math.min(1.35, viewport.width * 0.055, viewport.height * 0.07);
+  const safeHalfWidth = Math.max(0.5, viewport.width * 0.5 - clusterRadius - 0.35);
+  const safeHalfHeight = Math.max(0.5, viewport.height * 0.5 - clusterRadius - 0.45);
+  const xMin = Math.max(viewport.width * 0.12, -safeHalfWidth);
+  const xMax = Math.min(viewport.width * 0.38, safeHalfWidth);
+  const yMax = Math.min(viewport.height * 0.34, safeHalfHeight);
+  const clusterCenters = [];
 
-    band.addColorStop(0, "rgba(115, 151, 255, 0)");
-    band.addColorStop(0.23, "rgba(107, 138, 225, 0.035)");
-    band.addColorStop(0.42, "rgba(165, 165, 247, 0.11)");
-    band.addColorStop(0.5, "rgba(222, 219, 255, 0.24)");
-    band.addColorStop(0.57, "rgba(164, 170, 239, 0.12)");
-    band.addColorStop(0.78, "rgba(103, 134, 220, 0.035)");
-    band.addColorStop(1, "rgba(115, 151, 255, 0)");
-    context.fillStyle = band;
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.globalCompositeOperation = "screen";
-
-    for (let index = 0; index < 1500; index += 1) {
-      const x = random() * canvas.width;
-      const y = canvas.height * 0.5 + gaussian(random) * 91;
-      const radius = 18 + random() * 92;
-      const alpha = 0.018 + random() * 0.05;
-      const tint = random() > 0.72 ? "185, 164, 255" : "169, 202, 255";
-      const cloud = context.createRadialGradient(x, y, 0, x, y, radius);
-      cloud.addColorStop(0, `rgba(${tint}, ${alpha})`);
-      cloud.addColorStop(1, `rgba(${tint}, 0)`);
-      context.fillStyle = cloud;
-      context.beginPath();
-      context.ellipse(x, y, radius, radius * (0.22 + random() * 0.46), random() * Math.PI, 0, Math.PI * 2);
-      context.fill();
+  for (let cluster = 0; cluster < clusterCount; cluster += 1) {
+    let center = null;
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const x = xMin + random() * (xMax - xMin);
+      const y = (random() * 2 - 1) * yMax;
+      center = [x, y];
+      if (clusterCenters.every(([otherX, otherY]) => Math.hypot(otherX - x, otherY - y) > Math.min(2.8, viewport.width * 0.12))) break;
     }
+    clusterCenters.push(center);
+  }
 
-    context.globalCompositeOperation = "multiply";
-    context.lineCap = "round";
-    for (let lane = 0; lane < 7; lane += 1) {
-      context.beginPath();
-      context.moveTo(0, canvas.height * (0.39 + lane * 0.035));
-      for (let x = 0; x <= canvas.width; x += 64) {
-        const y = canvas.height * (0.4 + lane * 0.035) + Math.sin(x * 0.009 + lane) * 35 + gaussian(random) * 12;
-        context.lineTo(x, y);
-      }
-      context.strokeStyle = "rgba(8, 11, 28, 0.09)";
-      context.lineWidth = 5 + random() * 13;
-      context.stroke();
-    }
+  const positions = [];
+  const groups = Array.from({ length: clusterCount }, () => []);
+  repositories.forEach((repository, index) => {
+    const clusterIndex = Math.min(clusterCount - 1, Math.floor(index * clusterCount / repositories.length));
+    const [centerX, centerY] = clusterCenters[clusterIndex];
+    const group = groups[clusterIndex];
+    const radius = clusterRadius * (0.25 + random() * 0.75);
+    const angle = random() * Math.PI * 2;
+    const position = [
+      centerX + Math.cos(angle) * radius,
+      centerY + Math.sin(angle) * radius * 0.82,
+      (random() - 0.5) * 0.8,
+    ];
+    positions[index] = position;
+    group.push(index);
+  });
 
-    const result = new CanvasTexture(canvas);
-    result.colorSpace = SRGBColorSpace;
-    return result;
-  }, []);
+  const connections = [];
+  groups.forEach((group) => {
+    if (group.length < 2) return;
+    const [centerX, centerY] = clusterCenters[groups.indexOf(group)];
+    const ordered = [...group].sort((a, b) => {
+      const positionA = positions[a];
+      const positionB = positions[b];
+      return Math.atan2(positionA[1] - centerY, positionA[0] - centerX) - Math.atan2(positionB[1] - centerY, positionB[0] - centerX);
+    });
 
-  return (
-    <mesh position={[0, 0, -0.75]} rotation={[0, 0, 0.39]}>
-      <planeGeometry args={[28, 9.5]} />
-      <meshBasicMaterial map={texture} transparent opacity={0.82} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
-    </mesh>
-  );
+    ordered.forEach((index, orderedIndex) => {
+      const next = ordered[(orderedIndex + 1) % ordered.length];
+      connections.push(...positions[index], ...positions[next]);
+    });
+    if (ordered.length >= 4) connections.push(...positions[ordered[0]], ...positions[ordered[2]]);
+  });
+
+  return { positions, connectionPositions: new Float32Array(connections) };
 }
 
 function GalaxyCore() {
@@ -144,54 +133,152 @@ function GalaxyCore() {
   );
 }
 
-function RepositoryStar({ repository, index, total, viewWidth, viewHeight, onHover, onSelect }) {
-  const position = useMemo(() => {
-    const angle = 0.39;
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    const maxAlong = Math.min((viewWidth * 0.47) / cos, (viewHeight * 0.45) / sin);
-    const along = ((index + 0.5) / total - 0.5) * maxAlong * 1.8 + Math.sin(index * 11.7) * 0.16;
-    const cross = Math.sin(index * 5.83) * 1.05;
-    return [along * cos - cross * sin, along * sin + cross * cos, (index % 5) * 0.14 - 0.2];
-  }, [index, total, viewWidth, viewHeight]);
-  const color = STAR_COLORS[index % STAR_COLORS.length];
-  const size = 0.075 + Math.min(Math.log2(repository.stargazers_count + 1) * 0.025, 0.13);
+function ShootingStar({ index, viewWidth, viewHeight }) {
+  const streak = useRef(null);
+  const cycle = 8 + index * 3.7;
+  const duration = 0.72;
+  const startX = -viewWidth * (0.32 + index * 0.08);
+  const startY = viewHeight * (0.26 - index * 0.18);
+
+  useFrame(({ clock }) => {
+    if (!streak.current) return;
+    const phase = (clock.elapsedTime + index * 2.8) % cycle;
+    const progress = phase / duration;
+    const visible = phase < duration;
+    streak.current.visible = visible;
+    if (!visible) return;
+
+    const eased = progress * progress * (3 - 2 * progress);
+    streak.current.position.set(startX + eased * viewWidth * 0.38, startY - eased * viewHeight * 0.22, 1.7);
+    streak.current.scale.setScalar(Math.sin(progress * Math.PI) * 0.9 + 0.1);
+  });
 
   return (
-    <Float speed={0.7 + (index % 5) * 0.12} rotationIntensity={0.4} floatIntensity={0.2}>
-      <group position={position}>
-        <mesh
-          onPointerOver={(event) => {
-            event.stopPropagation();
-            document.body.style.cursor = "pointer";
-            onHover(repository);
-          }}
-          onPointerOut={() => {
-            document.body.style.cursor = "";
-            onHover(null);
-          }}
-          onFocus={() => onHover(repository)}
-          onClick={(event) => {
-            event.stopPropagation();
-            onSelect(repository);
-          }}
-        >
-          <octahedronGeometry args={[size, 0]} />
-          <meshBasicMaterial color={color} toneMapped={false} />
-        </mesh>
-        <mesh>
-          <sphereGeometry args={[size * 3.2, 12, 12]} />
-          <meshBasicMaterial color={color} transparent opacity={0.08} depthWrite={false} />
-        </mesh>
-      </group>
-    </Float>
+    <group ref={streak} rotation={[0, 0, -0.5]}>
+      <mesh scale={[0.5, 0.012, 0.012]}>
+        <sphereGeometry args={[1, 12, 8]} />
+        <meshBasicMaterial color="#f4eaff" transparent opacity={0.9} toneMapped={false} />
+      </mesh>
+      <mesh position={[0.32, 0, 0]}>
+        <sphereGeometry args={[0.035, 10, 8]} />
+        <meshBasicMaterial color="#ffffff" toneMapped={false} />
+      </mesh>
+    </group>
   );
 }
 
-function GalaxyContents({ repositories, onHover, onSelect, reduceMotion }) {
-  const { viewport } = useThree();
+function RepositoryStar({ repository, index, position, glowTexture, onHoldStart, onHoldEnd, onSelect }) {
+  const holdTimer = useRef(null);
+  const holdTriggered = useRef(false);
+  const isHolding = useRef(false);
+  const color = STAR_COLOR;
+  const size = 0.105 + Math.min(Math.log2(repository.stargazers_count + 1) * 0.025, 0.1);
+  const interactive = index < MAX_INTERACTIVE_STARS;
+
+  useEffect(() => () => clearTimeout(holdTimer.current), []);
+
+  return (
+    <group position={position}>
+      <sprite scale={[size * 12, size * 12, 1]} raycast={ignoreRaycast}>
+        <spriteMaterial
+          map={glowTexture}
+          color={color}
+          transparent
+          opacity={0.96}
+          blending={AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </sprite>
+      {interactive && <mesh
+        onPointerOver={(event) => {
+          event.stopPropagation();
+          document.body.style.cursor = "pointer";
+        }}
+        onPointerOut={(event) => {
+          document.body.style.cursor = "";
+          clearTimeout(holdTimer.current);
+          if (isHolding.current) {
+            isHolding.current = false;
+            onHoldEnd();
+          }
+        }}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+          holdTriggered.current = false;
+          isHolding.current = true;
+          onHoldStart();
+          clearTimeout(holdTimer.current);
+          holdTimer.current = setTimeout(() => {
+            holdTriggered.current = true;
+            onSelect(repository);
+          }, 460);
+        }}
+        onPointerUp={(event) => {
+          event.stopPropagation();
+          clearTimeout(holdTimer.current);
+          if (isHolding.current) {
+            isHolding.current = false;
+            onHoldEnd();
+          }
+        }}
+        onPointerCancel={() => {
+          clearTimeout(holdTimer.current);
+          isHolding.current = false;
+          onHoldEnd();
+        }}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (holdTriggered.current) {
+            holdTriggered.current = false;
+            return;
+          }
+          onSelect(repository);
+        }}
+      >
+        <sphereGeometry args={[size * 2.4, 8, 8]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>}
+      <mesh raycast={ignoreRaycast}>
+        <sphereGeometry args={[size * 0.68, 8, 8]} />
+        <meshBasicMaterial color="#f2faff" toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+function GalaxyContents({ repositories, onSelect, onHoldStart, onHoldEnd, reduceMotion, lowPower }) {
+  const { viewport, invalidate } = useThree();
   const galaxy = useRef(null);
   const pointer = useRef({ x: 0, y: 0 });
+  const lastFrame = useRef(-1);
+  const frameTimer = useRef(null);
+  const scatterSeed = useRef(Math.floor(Math.random() * 0xffffffff));
+  const constellations = useMemo(
+    () => createConstellations(repositories, viewport, scatterSeed.current),
+    [repositories, viewport.width, viewport.height],
+  );
+  const connectionGeometry = useMemo(() => {
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new Float32BufferAttribute(constellations.connectionPositions, 3));
+    return geometry;
+  }, [constellations.connectionPositions]);
+  const glowTexture = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 32;
+    canvas.height = 32;
+    const context = canvas.getContext("2d");
+    const gradient = context.createRadialGradient(16, 16, 0.5, 16, 16, 16);
+    gradient.addColorStop(0, "rgba(255,255,255,0.95)");
+    gradient.addColorStop(0.12, "rgba(255,255,255,0.68)");
+    gradient.addColorStop(0.36, "rgba(255,255,255,0.22)");
+    gradient.addColorStop(1, "rgba(255,255,255,0)");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 32, 32);
+    return new CanvasTexture(canvas);
+  }, []);
+
+  useEffect(() => () => glowTexture.dispose(), [glowTexture]);
 
   useEffect(() => {
     const trackPointer = (event) => {
@@ -199,34 +286,62 @@ function GalaxyContents({ repositories, onHover, onSelect, reduceMotion }) {
       pointer.current.y = (event.clientY / window.innerHeight) * 2 - 1;
     };
     window.addEventListener("pointermove", trackPointer, { passive: true });
-    return () => window.removeEventListener("pointermove", trackPointer);
-  }, []);
+    const wake = () => {
+      if (document.hidden) {
+        window.clearTimeout(frameTimer.current);
+        frameTimer.current = null;
+      } else {
+        invalidate();
+      }
+    };
+    document.addEventListener("visibilitychange", wake);
+    invalidate();
+    return () => {
+      window.removeEventListener("pointermove", trackPointer);
+      document.removeEventListener("visibilitychange", wake);
+    };
+  }, [invalidate]);
 
-  useFrame((_, delta) => {
-    if (!galaxy.current || reduceMotion) return;
+  useEffect(() => () => window.clearTimeout(frameTimer.current), []);
+
+  useFrame((state, delta) => {
+    const { clock } = state;
+    if (!galaxy.current || reduceMotion || document.hidden) return;
+    // Demand-render at 24 FPS: sufficient for slow space motion and lighter on GPU/CPU.
+    if (clock.elapsedTime - lastFrame.current < 1 / 24) return;
+    lastFrame.current = clock.elapsedTime;
     const smoothing = 1 - Math.exp(-delta * 1.5);
     galaxy.current.rotation.y += (pointer.current.x * 0.035 - galaxy.current.rotation.y) * smoothing;
     galaxy.current.rotation.x += (-pointer.current.y * 0.025 - galaxy.current.rotation.x) * smoothing;
-    galaxy.current.rotation.z += delta * 0.003;
+    galaxy.current.rotation.z = Math.sin(clock.elapsedTime * 0.035) * 0.004;
+    window.clearTimeout(frameTimer.current);
+    frameTimer.current = window.setTimeout(() => {
+      frameTimer.current = null;
+      if (!document.hidden) state.invalidate();
+    }, 1000 / 24);
   });
 
   return (
     <group ref={galaxy}>
-      <ambientLight intensity={0.35} />
-      <Stars radius={100} depth={65} count={4200} factor={1.8} saturation={0.35} fade speed={0.12} />
-      <Sparkles count={75} scale={[22, 14, 9]} size={1.8} speed={0.12} opacity={0.35} color="#c4d6ff" />
-      <MilkyWayCloud />
-      <GalaxyDust />
+      <ambientLight intensity={0.55} />
+      <directionalLight position={[4, 7, 12]} color="#d7d9ff" intensity={1.6} />
+      <GalaxyDust lowPower={lowPower} />
       <GalaxyCore />
+      {!lowPower && !reduceMotion && <ShootingStar index={0} viewWidth={viewport.width} viewHeight={viewport.height} />}
+      {constellations.connectionPositions.length > 0 && (
+        <lineSegments geometry={connectionGeometry} raycast={ignoreRaycast}>
+          <lineBasicMaterial color="#9dd9ff" transparent opacity={0.42} blending={AdditiveBlending} depthWrite={false} />
+        </lineSegments>
+      )}
       {repositories.map((repository, index) => (
         <RepositoryStar
           key={repository.id}
           repository={repository}
           index={index}
-          total={repositories.length}
-          viewWidth={viewport.width}
-          viewHeight={viewport.height}
-          onHover={onHover}
+          position={constellations.positions[index]}
+          glowTexture={glowTexture}
+          onHoldStart={onHoldStart}
+          onHoldEnd={onHoldEnd}
           onSelect={onSelect}
         />
       ))}
@@ -234,16 +349,24 @@ function GalaxyContents({ repositories, onHover, onSelect, reduceMotion }) {
   );
 }
 
-function GalaxyScene({ repositories, onHover, onSelect, onBackgroundClick }) {
+function GalaxyScene({ repositories, onSelect, onHoldStart, onHoldEnd, onBackgroundClick }) {
+  const lowPower = typeof window !== "undefined" && (
+    window.matchMedia("(max-width: 700px)").matches ||
+    (navigator.deviceMemory && navigator.deviceMemory <= 4)
+  );
+  const reduceMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
   return (
     <Canvas
       className="galaxy-canvas"
-      camera={{ position: [0, 0, 15], fov: 48 }}
-      dpr={[1, 1.3]}
-      gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
+      camera={{ position: [0, 0, 19], fov: 52 }}
+      dpr={1}
+      frameloop="demand"
+      gl={{ alpha: true, antialias: false, powerPreference: "low-power", stencil: false, depth: true, preserveDrawingBuffer: false }}
+      performance={{ min: 0.55 }}
       onPointerMissed={onBackgroundClick}
     >
-      <GalaxyContents repositories={repositories} onHover={onHover} onSelect={onSelect} reduceMotion={useReducedMotion()} />
+      <GalaxyContents repositories={repositories} onSelect={onSelect} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} reduceMotion={reduceMotion} lowPower={lowPower} />
     </Canvas>
   );
 }
@@ -254,12 +377,11 @@ function formatCount(count) {
 
 export default function App() {
   const [repositories, setRepositories] = useState([]);
-  const [hoveredRepository, setHoveredRepository] = useState(null);
   const [selectedRepository, setSelectedRepository] = useState(null);
+  const [isHolding, setIsHolding] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const hideTimer = useRef(null);
   const reduceMotion = useReducedMotion();
-  const activeRepository = hoveredRepository || selectedRepository;
+  const activeRepository = selectedRepository;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -280,24 +402,17 @@ export default function App() {
     return () => controller.abort();
   }, []);
 
-  const handleStarHover = useCallback((repository) => {
-    clearTimeout(hideTimer.current);
-    if (repository) setHoveredRepository(repository);
-    else {
-      hideTimer.current = setTimeout(() => setHoveredRepository(null), 420);
-    }
-  }, []);
-
   const selectRepository = useCallback((repository) => {
+    setIsHolding(false);
     setSelectedRepository((selected) => selected?.id === repository.id ? null : repository);
-    setHoveredRepository(repository);
   }, []);
 
   const dismissRepository = useCallback(() => {
-    clearTimeout(hideTimer.current);
-    setHoveredRepository(null);
     setSelectedRepository(null);
+    setIsHolding(false);
   }, []);
+  const beginHold = useCallback(() => setIsHolding(true), []);
+  const endHold = useCallback(() => setIsHolding(false), []);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -307,18 +422,15 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [dismissRepository]);
 
-  const explore = () => {
-    if (repositories.length) selectRepository(repositories[Math.floor(Math.random() * repositories.length)]);
-  };
-
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#070916] text-white selection:bg-fuchsia-200 selection:text-indigo-950">
+    <main className="fixed inset-0 overflow-hidden bg-[#070916] text-white selection:bg-fuchsia-200 selection:text-indigo-950">
       <div className="cosmic-wash" aria-hidden="true" />
       <div className="absolute inset-0 z-0" aria-hidden="true">
         <GalaxyScene
           repositories={repositories}
-          onHover={handleStarHover}
           onSelect={selectRepository}
+          onHoldStart={beginHold}
+          onHoldEnd={endHold}
           onBackgroundClick={dismissRepository}
         />
       </div>
@@ -326,8 +438,21 @@ export default function App() {
       <div className="pointer-events-none absolute inset-0 z-1 bg-linear-to-r from-[#080a1b]/72 via-[#080a1b]/32 to-transparent md:from-[#080a1b]/68 md:via-[#080a1b]/16" />
       <div className="pointer-events-none absolute inset-0 z-1 bg-linear-to-t from-[#080a1b]/58 via-transparent to-[#080a1b]/25" />
 
+      <AnimatePresence>
+        {isHolding && (
+          <motion.div
+            className="pointer-events-none fixed bottom-7 left-1/2 z-20 -translate-x-1/2 rounded-full border border-cyan-100/20 bg-[#101329]/80 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 backdrop-blur-xl"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+          >
+            Release to preview repository
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <motion.header
-        className="relative z-10 flex items-center justify-between px-6 py-6 sm:px-10 lg:px-16"
+        className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-6 py-6 sm:px-10 lg:px-16"
         initial={reduceMotion ? false : { opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: "easeOut" }}
@@ -341,9 +466,9 @@ export default function App() {
         </a>
       </motion.header>
 
-      <section className="relative z-10 flex min-h-[calc(100svh-88px)] items-center px-6 pb-24 pt-4 sm:px-10 lg:px-16" aria-labelledby="intro-title">
+      <section className="pointer-events-none absolute inset-0 z-10 flex items-center px-6 pb-12 pt-24 sm:px-10 sm:pb-16 lg:px-16" aria-labelledby="intro-title">
         <motion.div
-          className="max-w-165"
+          className="pointer-events-none max-w-165"
           initial={reduceMotion ? false : { opacity: 0, y: 28 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, delay: 0.12, ease: [0.2, 0.7, 0.2, 1] }}
@@ -358,14 +483,11 @@ export default function App() {
           </h1>
 
           <p className="mt-7 max-w-117.5 text-sm leading-7 text-indigo-100/70 sm:text-base sm:leading-8">
-            Welcome to my corner of the universe. Every glowing star is a public GitHub project—hover to discover it, or open one to explore the code.
+            Welcome to my corner of the universe. Press and hold any glowing star to preview its public GitHub repository.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <button type="button" onClick={explore} className="group inline-flex items-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#101126] shadow-[0_6px_40px_rgba(161,212,255,0.2)] transition hover:-translate-y-0.5 hover:bg-cyan-100 hover:shadow-[0_10px_45px_rgba(161,212,255,0.32)]">
-              Explore a project <SparkleIcon size={16} className="transition group-hover:rotate-12" />
-            </button>
-            <a href={`https://github.com/${GITHUB_USERNAME}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/4.5 px-5 py-3 text-sm font-medium text-white/80 backdrop-blur-md transition hover:border-fuchsia-200/40 hover:bg-white/10 hover:text-white">
+            <a href={`https://github.com/${GITHUB_USERNAME}`} target="_blank" rel="noreferrer" className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/4.5 px-5 py-3 text-sm font-medium text-white/80 backdrop-blur-md transition hover:border-fuchsia-200/40 hover:bg-white/10 hover:text-white">
               <GitBranch size={16} /> GitHub profile <ArrowUpRight size={15} />
             </a>
           </div>
@@ -377,10 +499,6 @@ export default function App() {
         </motion.div>
       </section>
 
-      <motion.div className="pointer-events-none absolute bottom-6 left-6 z-10 flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-white/35 sm:left-10 lg:left-16" initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2 }}>
-        <ArrowDown size={13} className="animate-bounce" /> Move through the stars
-      </motion.div>
-
       <AnimatePresence mode="wait">
         {activeRepository && (
           <motion.aside
@@ -390,10 +508,6 @@ export default function App() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            onMouseEnter={() => clearTimeout(hideTimer.current)}
-            onMouseLeave={() => {
-              if (!selectedRepository) setHoveredRepository(null);
-            }}
             aria-live="polite"
           >
             <a href={activeRepository.html_url} target="_blank" rel="noreferrer" className="group block rounded-2xl border border-white/15 bg-[#111329]/85 p-5 shadow-[0_20px_80px_rgba(0,0,0,0.5),0_0_40px_rgba(151,131,255,0.12)] backdrop-blur-2xl transition hover:border-cyan-100/35">
