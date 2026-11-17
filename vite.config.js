@@ -10,8 +10,7 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes("/node_modules/three/")) return "three";
           if (id.includes("/node_modules/@react-three/") || id.includes("/node_modules/three-stdlib/")) return "react-three";
-          if (id.includes("/node_modules/framer-motion/") || id.includes("/node_modules/motion-")) return "motion";
-          if (id.includes("/node_modules/react/") || id.includes("/node_modules/scheduler/")) return "react-vendor";
+          if (id.includes("/node_modules/react/") || id.includes("/node_modules/react-dom/") || id.includes("/node_modules/scheduler/")) return "react-vendor";
         },
       },
     },
