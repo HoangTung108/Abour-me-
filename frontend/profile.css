@@ -32,7 +32,11 @@
 .expertise-mark { display: grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0; border: 1px solid color-mix(in srgb, var(--skill-color) 25%, transparent); border-radius: 9px; color: var(--skill-color); background: color-mix(in srgb, var(--skill-color) 7%, transparent); font: 500 11px 'DM Mono', monospace; }
 .expertise-info h3 { font: 500 13px 'Space Grotesk', sans-serif; color: #e4ebf7; }
 .expertise-info p { font-size: 10px; margin-top: 3px; color: #9eafc9; }
-.expertise-level { margin-left: auto; font-size: 10px; color: var(--skill-color); padding: 4px 8px; border-radius: 6px; background: color-mix(in srgb, var(--skill-color) 7%, transparent); white-space: nowrap; }
+.expertise-rating { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; color: var(--skill-color); }
+.rating-stars { display: flex; gap: 3px; }
+.rating-stars .is-filled { fill: currentColor; }
+.rating-stars .is-empty { color: #8190ac65; fill: none; }
+.rating-score { font-size: 9px; font-variant-numeric: tabular-nums; color: #aabbd4; }
 .embedded-note { display: flex; align-items: center; gap: 7px; margin-top: 12px; font-size: 10px; color: #98abc9; }
 .embedded-note strong { font-weight: 500; color: #c9c1e5; }
 .personal-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 16px; margin-top: 12px; border-top: 1px solid #bed2ff15; font-size: 9px; color: #92a7c5; }

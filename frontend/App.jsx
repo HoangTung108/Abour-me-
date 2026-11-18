@@ -179,7 +179,10 @@ export default function App() {
                 {personalProfile.skills.map(skill => <div className="expertise-row" key={skill.name} style={{ '--skill-color': skill.color }}>
                   <span className="expertise-mark">{skill.mark}</span>
                   <div className="expertise-info"><h3>{skill.name}</h3><p>{skill.context}</p></div>
-                  <span className="expertise-level">{skill.level}</span>
+                  <span className="expertise-rating" role="img" aria-label={skill.name + ': ' + skill.rating + '/5 sao'}>
+                    <span className="rating-stars" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <Star key={index} size={12} className={index < skill.rating ? 'is-filled' : 'is-empty'} />)}</span>
+                    <span className="rating-score" aria-hidden="true">{skill.rating}/5</span>
+                  </span>
                 </div>)}
                 <p className="embedded-note"><Cpu size={14} /><span><strong>Hệ thống nhúng</strong> · Kiến thức bổ trợ</span></p>
               </div>
