@@ -25,6 +25,7 @@ export default function App() {
   const [showProjects, setShowProjects] = useState(false);
   const [profileTab, setProfileTab] = useState("about");
   const [loaded, setLoaded] = useState(false);
+  const [avatarUnavailable, setAvatarUnavailable] = useState(false);
   const unavailable = useCallback(() => setSceneUnavailable(true), []);
   useEffect(() => {
     const id = window.setTimeout(() => setSceneReady(true), 250);
@@ -174,7 +175,7 @@ export default function App() {
 
           <article className="personal-card" aria-label="Personal profile">
             <div className="personal-identity">
-              <div className="personal-avatar">{profile?.avatar_url ? <img src={profile.avatar_url} alt="" width="60" height="60" /> : <Code2 size={27} />}<span /></div>
+              <div className="personal-avatar">{avatarUnavailable ? <Code2 size={27} /> : <img src={`https://github.com/${GITHUB_USERNAME}.png?size=120`} alt="" width="60" height="60" onError={() => { console.warn("Could not load GitHub avatar"); setAvatarUnavailable(true); }} />}<span /></div>
               <div><h2>{profile?.name || personalProfile.name}</h2><p>{personalProfile.role}</p></div>
               <span className="personal-monogram" aria-hidden="true">&lt;/&gt;</span>
             </div>
