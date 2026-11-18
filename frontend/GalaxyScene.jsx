@@ -1,15 +1,8 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { AdditiveBlending, BufferGeometry, Float32BufferAttribute } from "three";
+import { createConstellations, seededRandom } from "./constellations.js";
 const ignoreRaycast = () => null;
-
-function seededRandom(seed) {
-  let value = seed >>> 0;
-  return () => {
-    value = (value * 1664525 + 1013904223) >>> 0;
-    return value / 4294967296;
-  };
-}
 
 function gaussian(random) {
   return Math.sqrt(-2 * Math.log(Math.max(random(), 0.0001))) * Math.cos(2 * Math.PI * random());
@@ -147,65 +140,6 @@ function DistantStars({ reduceMotion, foreground = false }) {
   </points>;
 }
 
-function createConstellations(repositories, viewport, seed) {
-  const random = seededRandom(seed);
-  const clusterCount = Math.ceil(repositories.length / 4);
-  const clusterRadius = Math.min(1.35, viewport.width * 0.055, viewport.height * 0.07);
-  const safeHalfWidth = Math.max(0.5, viewport.width * 0.5 - clusterRadius - 0.35);
-  const safeHalfHeight = Math.max(0.5, viewport.height * 0.5 - clusterRadius - 0.45);
-  const xMin = Math.max(viewport.width * 0.12, -safeHalfWidth);
-  const xMax = Math.min(viewport.width * 0.38, safeHalfWidth);
-  const yMax = Math.min(viewport.height * 0.34, safeHalfHeight);
-  const clusterCenters = [];
-
-  for (let cluster = 0; cluster < clusterCount; cluster += 1) {
-    let center = null;
-    for (let attempt = 0; attempt < 60; attempt += 1) {
-      const x = xMin + random() * (xMax - xMin);
-      const y = (random() * 2 - 1) * yMax;
-      center = [x, y];
-      if (clusterCenters.every(([otherX, otherY]) => Math.hypot(otherX - x, otherY - y) > Math.min(2.8, viewport.width * 0.12))) break;
-    }
-    clusterCenters.push(center);
-  }
-
-  const positions = [];
-  const groups = Array.from({ length: clusterCount }, () => []);
-  repositories.forEach((repository, index) => {
-    const clusterIndex = Math.min(clusterCount - 1, Math.floor(index * clusterCount / repositories.length));
-    const [centerX, centerY] = clusterCenters[clusterIndex];
-    const group = groups[clusterIndex];
-    const radius = clusterRadius * (0.25 + random() * 0.75);
-    const angle = random() * Math.PI * 2;
-    const position = [
-      centerX + Math.cos(angle) * radius,
-      centerY + Math.sin(angle) * radius * 0.82,
-      (random() - 0.5) * 0.8,
-    ];
-    positions[index] = position;
-    group.push(index);
-  });
-
-  const connections = [];
-  groups.forEach((group) => {
-    if (group.length < 2) return;
-    const [centerX, centerY] = clusterCenters[groups.indexOf(group)];
-    const ordered = [...group].sort((a, b) => {
-      const positionA = positions[a];
-      const positionB = positions[b];
-      return Math.atan2(positionA[1] - centerY, positionA[0] - centerX) - Math.atan2(positionB[1] - centerY, positionB[0] - centerX);
-    });
-
-    ordered.forEach((index, orderedIndex) => {
-      const next = ordered[(orderedIndex + 1) % ordered.length];
-      connections.push(...positions[index], ...positions[next]);
-    });
-    if (ordered.length >= 4) connections.push(...positions[ordered[0]], ...positions[ordered[2]]);
-  });
-
-  return { positions, connectionPositions: new Float32Array(connections) };
-}
-
 function GalaxyCore({ swirl }) {
   const { viewport } = useThree();
   const material = useRef(null);
@@ -281,15 +215,16 @@ function ShootingStar({ index, viewWidth, viewHeight }) {
   );
 }
 
-function RepositoryStars({ repositories, positions, selectedRepository, previewRepository, onSelect, onPreview }) {
+function RepositoryStars({ repositories, positions, spacing, selectedRepository, previewRepository, onSelect, onPreview }) {
   const activeId = (previewRepository || selectedRepository)?.id;
   const geometry = useMemo(() => {
     const result = new BufferGeometry();
     result.setAttribute("position", new Float32BufferAttribute(positions.flat(), 3));
-    result.setAttribute("size", new Float32BufferAttribute(repositories.map(repo => 55 + Math.min(Math.log2((repo.stargazers_count ?? 0) + 1) * 4, 20)), 1));
+    const sizeLimit = spacing * 3 / 2.55 * 0.9;
+    result.setAttribute("size", new Float32BufferAttribute(repositories.map(repo => Math.min(sizeLimit, 55 + Math.min(Math.log2((repo.stargazers_count ?? 0) + 1) * 4, 20))), 1));
     result.setAttribute("highlighted", new Float32BufferAttribute(repositories.map(repo => repo.id === activeId ? 1 : 0), 1));
     return result;
-  }, [positions, repositories, activeId]);
+  }, [positions, repositories, spacing, activeId]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   useEffect(() => () => { document.body.style.cursor = ""; }, []);
   const preview = event => {
@@ -347,7 +282,7 @@ function NebulaVeil() {
 }
 
 function GalaxyContents({ repositories, selectedRepository, previewRepository, onSelect, onPreview, reduceMotion }) {
-  const { viewport, invalidate } = useThree();
+  const { viewport, size, raycaster, invalidate } = useThree();
   const galaxy = useRef(null);
   const farLayer = useRef(null);
   const nearLayer = useRef(null);
@@ -356,9 +291,12 @@ function GalaxyContents({ repositories, selectedRepository, previewRepository, o
 
   const scatterSeed = useRef(108);
   const constellations = useMemo(
-    () => createConstellations(repositories, viewport, scatterSeed.current),
-    [repositories, viewport.width, viewport.height],
+    () => createConstellations(repositories, viewport, size, scatterSeed.current),
+    [repositories, viewport.width, viewport.height, size.width, size.height],
   );
+  useEffect(() => {
+    raycaster.params.Points.threshold = Math.min(0.42, constellations.spacing * 0.45 * viewport.width / size.width);
+  }, [raycaster, constellations.spacing, viewport.width, size.width]);
   const connectionGeometry = useMemo(() => {
     const geometry = new BufferGeometry();
     geometry.setAttribute("position", new Float32BufferAttribute(constellations.connectionPositions, 3));
@@ -413,7 +351,7 @@ function GalaxyContents({ repositories, selectedRepository, previewRepository, o
           <lineBasicMaterial color="#b9e8ff" transparent opacity={0.55} blending={AdditiveBlending} depthWrite={false} />
         </lineSegments>
       )}
-      <RepositoryStars repositories={repositories} positions={constellations.positions} selectedRepository={selectedRepository} previewRepository={previewRepository} onSelect={onSelect} onPreview={onPreview} />
+      <RepositoryStars repositories={repositories} positions={constellations.positions} spacing={constellations.spacing} selectedRepository={selectedRepository} previewRepository={previewRepository} onSelect={onSelect} onPreview={onPreview} />
       </group>
       <group ref={nearLayer}><DistantStars reduceMotion={reduceMotion} foreground /></group>
     </>
