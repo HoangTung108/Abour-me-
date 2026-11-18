@@ -37,10 +37,11 @@ export default function App() {
     return () => controller.abort();
   }, []);
   const [selectedRepository, setSelectedRepository] = useState(null);
+  const [previewRepository, setPreviewRepository] = useState(null);
   const [isHolding, setIsHolding] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const reduceMotion = useReducedMotion();
-  const activeRepository = selectedRepository;
+  const activeRepository = previewRepository || selectedRepository;
   useEffect(() => {
     const controller = new AbortController();
 
@@ -78,10 +79,14 @@ export default function App() {
 
   const dismissRepository = useCallback(() => {
     setSelectedRepository(null);
+    setPreviewRepository(null);
     setIsHolding(false);
   }, []);
   const beginHold = useCallback(() => setIsHolding(true), []);
-  const endHold = useCallback(() => setIsHolding(false), []);
+  const endHold = useCallback(() => {
+    setIsHolding(false);
+    setPreviewRepository(null);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -99,8 +104,10 @@ export default function App() {
         {sceneReady && !sceneUnavailable && <SceneBoundary onUnavailable={unavailable}><Suspense fallback={null}><GalaxyScene
           reduceMotion={Boolean(reduceMotion)} onUnavailable={unavailable}
           repositories={repositories}
+          selectedRepository={selectedRepository}
           onSelect={selectRepository}
           onHoldStart={beginHold}
+          onHoldPreview={setPreviewRepository}
           onHoldEnd={endHold}
           onBackgroundClick={dismissRepository}
         /></Suspense></SceneBoundary>}
@@ -146,19 +153,18 @@ export default function App() {
           transition={{ duration: 0.9, delay: 0.12, ease: [0.2, 0.7, 0.2, 1] }}
         >
           <div className="personal-heading">
-            <p className="intro-eyebrow"><span /> PERSONAL SPACE / PORTFOLIO</p>
-            <h1 id="intro-title">Xin chào, mình là<br /><span className="cosmic-gradient">{personalProfile.name}.</span></h1>
-            <p className="personal-tagline">Ý tưởng của bạn. Trải nghiệm chúng ta cùng tạo ra.</p>
+            <p className="intro-eyebrow"><span /> PORTFOLIO</p>
+            <h1 id="intro-title">Hello, I’m <span className="cosmic-gradient">{personalProfile.name}.</span></h1>
           </div>
 
-          <article className="personal-card" aria-label="Hồ sơ cá nhân">
+          <article className="personal-card" aria-label="Personal profile">
             <div className="personal-identity">
               <div className="personal-avatar">{profile?.avatar_url ? <img src={profile.avatar_url} alt="" width="60" height="60" /> : <Code2 size={27} />}<span /></div>
               <div><h2>{profile?.name || personalProfile.name}</h2><p>{personalProfile.role}</p></div>
               <span className="personal-monogram" aria-hidden="true">&lt;/&gt;</span>
             </div>
-            <div className="personal-tabs" role="tablist" aria-label="Thông tin profile">
-              {[['about', 'Giới thiệu'], ['skills', 'Kỹ năng']].map(([id, label]) => <button key={id} id={'tab-' + id} role="tab" aria-selected={profileTab === id} aria-controls={'panel-' + id} tabIndex={profileTab === id ? 0 : -1} onClick={() => setProfileTab(id)} onKeyDown={event => {
+            <div className="personal-tabs" role="tablist" aria-label="Profile information">
+              {[['about', 'About'], ['skills', 'Skills']].map(([id, label]) => <button key={id} id={'tab-' + id} role="tab" aria-selected={profileTab === id} aria-controls={'panel-' + id} tabIndex={profileTab === id ? 0 : -1} onClick={() => setProfileTab(id)} onKeyDown={event => {
                 if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
                   event.preventDefault();
                   const next = event.key === 'Home' ? 'about' : event.key === 'End' ? 'skills' : id === 'about' ? 'skills' : 'about';
@@ -171,24 +177,24 @@ export default function App() {
               <div className="about-panel" id="panel-about" role="tabpanel" aria-labelledby="tab-about" tabIndex={0} hidden={profileTab !== "about"}>
                 <p className="personal-intro">{personalProfile.intro}</p>
                 <p className="personal-detail">{personalProfile.detail}</p>
-                <div className="focus-grid" aria-label="Lĩnh vực chuyên môn">
+                <div className="focus-grid" aria-label="Areas of expertise">
                   {[Layers, Gamepad2, Globe, Cpu].map((Icon, index) => <div key={personalProfile.areas[index]}><Icon size={17} /><span>{personalProfile.areas[index]}</span></div>)}
                 </div>
               </div><div className="expertise-panel" id="panel-skills" role="tabpanel" aria-labelledby="tab-skills" tabIndex={0} hidden={profileTab !== "skills"}>
-                <p className="expertise-caption">NGÔN NGỮ CHỦ ĐẠO <span>Tự đánh giá</span></p>
+                <p className="expertise-caption">PRIMARY LANGUAGES <span>Self-assessed</span></p>
                 {personalProfile.skills.map(skill => <div className="expertise-row" key={skill.name} style={{ '--skill-color': skill.color }}>
                   <span className="expertise-mark">{skill.mark}</span>
                   <div className="expertise-info"><h3>{skill.name}</h3><p>{skill.context}</p></div>
                   <span className="expertise-rating" role="img" aria-label={skill.name + ': ' + skill.rating + '/5 sao'}>
                     <span className="rating-stars" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <Star key={index} size={12} className={index < skill.rating ? 'is-filled' : 'is-empty'} />)}</span>
-                    <span className="rating-score" aria-hidden="true">{skill.rating}/5</span>
+                    {/* <span className="rating-score" aria-hidden="true">{skill.rating}/5</span> */}
                   </span>
                 </div>)}
-                <p className="embedded-note"><Cpu size={14} /><span><strong>Hệ thống nhúng</strong> · Kiến thức bổ trợ</span></p>
+                <p className="embedded-note"><Cpu size={14} /><span><strong>Embedded systems</strong> · Additional knowledge</span></p>
               </div>
             </div>
             <div className="personal-footer">
-              <span><span className="personal-status-dot" />{loadError ? 'Khám phá dự án trên GitHub' : loaded ? repositories.length + ' dự án công khai' : 'Đang kết nối GitHub'}</span>
+              <span><span className="personal-status-dot" />{loadError ? 'Explore projects on GitHub' : loaded ? repositories.length + ` public project${repositories.length === 1 ? '' : 's'}` : 'Connecting to GitHub'}</span>
               <a href={'https://github.com/' + GITHUB_USERNAME} target="_blank" rel="noreferrer">@{GITHUB_USERNAME}<ArrowUpRight size={13} /></a>
             </div>
           </article>
@@ -203,7 +209,7 @@ export default function App() {
         {activeRepository && (
           <motion.aside
             key={activeRepository.id}
-            className="fixed bottom-20 right-5 z-30 w-[min(360px,calc(100vw-40px))] sm:bottom-24 sm:right-8"
+            className={`fixed bottom-20 right-5 z-30 w-[min(360px,calc(100vw-40px))] sm:bottom-24 sm:right-8 ${previewRepository ? 'pointer-events-none' : ''}`}
             initial={{ opacity: 0, y: 18, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
@@ -219,7 +225,7 @@ export default function App() {
                 </div>
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/6 text-fuchsia-200 transition group-hover:rotate-45 group-hover:border-fuchsia-200/30"><ArrowUpRight size={17} /></span>
               </div>
-              {activeRepository.description && <p className="mt-3 line-clamp-2 text-sm leading-6 text-indigo-100/65">{activeRepository.description}</p>}
+              <p className="mt-3 line-clamp-2 text-sm leading-6 text-indigo-100/65">{activeRepository.description || "No description provided."}</p>
               <div className="mt-4 flex items-center gap-4 font-mono text-[11px] text-white/55">
                 {activeRepository.language && <span className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-fuchsia-200" />{activeRepository.language}</span>}
                 <span className="flex items-center gap-1.5"><Star size={12} className="text-cyan-100" />{formatCount(activeRepository.stargazers_count)}</span>

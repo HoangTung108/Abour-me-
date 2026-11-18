@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { AdditiveBlending, BufferGeometry, Float32BufferAttribute } from "three";
 const ignoreRaycast = () => null;
@@ -281,31 +281,70 @@ function ShootingStar({ index, viewWidth, viewHeight }) {
   );
 }
 
-function RepositoryStars({ repositories, positions, onSelect, onHoldStart, onHoldEnd }) {
+function RepositoryStars({ repositories, positions, selectedRepository, onSelect, onHoldStart, onHoldPreview, onHoldEnd }) {
   const timer = useRef(null);
   const held = useRef(false);
+  const pointerId = useRef(null);
+  const [pressedRepository, setPressedRepository] = useState(null);
+  const activeId = (pressedRepository || selectedRepository)?.id;
   const geometry = useMemo(() => {
     const result = new BufferGeometry();
     result.setAttribute("position", new Float32BufferAttribute(positions.flat(), 3));
-    result.setAttribute("size", new Float32BufferAttribute(repositories.map(repo => 25 + Math.min(Math.log2(repo.stargazers_count + 1) * 4, 20)), 1));
+    result.setAttribute("size", new Float32BufferAttribute(repositories.map(repo => 38 + Math.min(Math.log2(repo.stargazers_count + 1) * 4, 20)), 1));
+    result.setAttribute("highlighted", new Float32BufferAttribute(repositories.map(repo => repo.id === activeId ? 1 : 0), 1));
     return result;
-  }, [positions, repositories]);
+  }, [positions, repositories, activeId]);
   useEffect(() => () => geometry.dispose(), [geometry]);
-  useEffect(() => () => { clearTimeout(timer.current); document.body.style.cursor = ""; }, []);
-  const cancel = () => { clearTimeout(timer.current); onHoldEnd(); };
+  useEffect(() => {
+    const finish = event => {
+      if (event.pointerId !== pointerId.current) return;
+      clearTimeout(timer.current);
+      pointerId.current = null;
+      setPressedRepository(null);
+      onHoldEnd();
+    };
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+    return () => {
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+      clearTimeout(timer.current);
+      document.body.style.cursor = "";
+    };
+  }, [onHoldEnd]);
   return <points geometry={geometry}
     onPointerOver={event => { event.stopPropagation(); document.body.style.cursor = "pointer"; }}
-    onPointerOut={() => { cancel(); document.body.style.cursor = ""; }}
-    onPointerDown={event => {
-      event.stopPropagation(); held.current = false; cancel(); onHoldStart();
-      const repository = repositories[event.index];
-      timer.current = setTimeout(() => { held.current = true; onSelect(repository); }, 460);
+    onPointerOut={() => {
+      document.body.style.cursor = "";
+      if (pointerId.current !== null) {
+        clearTimeout(timer.current);
+        pointerId.current = null;
+        held.current = true;
+        setPressedRepository(null);
+        onHoldEnd();
+      }
     }}
-    onPointerUp={cancel} onPointerCancel={cancel}
+    onPointerDown={event => {
+      if (event.button !== 0 || pointerId.current !== null) return;
+      event.stopPropagation(); held.current = false;
+      const repository = repositories[event.index];
+      if (!repository) return;
+      pointerId.current = event.pointerId;
+      setPressedRepository(repository);
+      onHoldStart();
+      timer.current = setTimeout(() => { held.current = true; onHoldPreview(repository); }, 460);
+    }}
     onClick={event => { event.stopPropagation(); if (!held.current) onSelect(repositories[event.index]); held.current = false; }}>
     <shaderMaterial transparent depthWrite={false} blending={AdditiveBlending}
-      vertexShader={`attribute float size; void main() { vec4 p = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * p; gl_PointSize = size * (19.0 / -p.z); }`}
-      fragmentShader={`void main() { float d = length(gl_PointCoord - 0.5) * 2.0; float glow = exp(-d * d * 7.0); float core = exp(-d * d * 100.0); gl_FragColor = vec4(mix(vec3(0.40, 0.72, 1.0), vec3(1.0), core), glow * 0.75 + core); }`} />
+      vertexShader={`attribute float size; attribute float highlighted; varying float highlight;
+        void main() { highlight = highlighted; vec4 p = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * p; gl_PointSize = size * (1.0 + highlighted * 0.55) * (19.0 / -p.z); }`}
+      fragmentShader={`varying float highlight; void main() {
+        float d = length(gl_PointCoord - 0.5) * 2.0;
+        float glow = exp(-d * d * 4.5);
+        float core = exp(-d * d * 55.0);
+        vec3 color = mix(vec3(0.48, 0.78, 1.0), vec3(1.0), min(1.0, core + highlight * 0.3));
+        gl_FragColor = vec4(color, glow * (0.85 + highlight * 0.35) + core);
+      }`} />
   </points>;
 }
 
@@ -328,7 +367,7 @@ function NebulaVeil() {
   </mesh>;
 }
 
-function GalaxyContents({ repositories, onSelect, onHoldStart, onHoldEnd, reduceMotion }) {
+function GalaxyContents({ repositories, selectedRepository, onSelect, onHoldStart, onHoldPreview, onHoldEnd, reduceMotion }) {
   const { viewport, invalidate } = useThree();
   const galaxy = useRef(null);
   const farLayer = useRef(null);
@@ -392,23 +431,23 @@ function GalaxyContents({ repositories, onSelect, onHoldStart, onHoldEnd, reduce
       {!reduceMotion && [0, 1, 2].map(index => <ShootingStar key={index} index={index} viewWidth={viewport.width} viewHeight={viewport.height} />)}
       {constellations.connectionPositions.length > 0 && (
         <lineSegments geometry={connectionGeometry} raycast={ignoreRaycast}>
-          <lineBasicMaterial color="#9dd9ff" transparent opacity={0.22} blending={AdditiveBlending} depthWrite={false} />
+          <lineBasicMaterial color="#b9e8ff" transparent opacity={0.55} blending={AdditiveBlending} depthWrite={false} />
         </lineSegments>
       )}
-      <RepositoryStars repositories={repositories} positions={constellations.positions} onSelect={onSelect} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
+      <RepositoryStars repositories={repositories} positions={constellations.positions} selectedRepository={selectedRepository} onSelect={onSelect} onHoldStart={onHoldStart} onHoldPreview={onHoldPreview} onHoldEnd={onHoldEnd} />
       </group>
       <group ref={nearLayer}><DistantStars reduceMotion={reduceMotion} foreground /></group>
     </>
   );
 }
 
-export default function GalaxyScene({ repositories, onSelect, onHoldStart, onHoldEnd, onBackgroundClick, reduceMotion, onUnavailable }) {
+export default function GalaxyScene({ repositories, selectedRepository, onSelect, onHoldStart, onHoldPreview, onHoldEnd, onBackgroundClick, reduceMotion, onUnavailable }) {
   return (
     <Canvas
       className="galaxy-canvas"
       camera={{ position: [0, 0, 19], fov: 52 }}
       dpr={1.5}
-      raycaster={{ params: { Points: { threshold: 0.24 } } }}
+      raycaster={{ params: { Points: { threshold: 0.3 } } }}
       fallback={<span className="sr-only">3D unavailable. Use the project list.</span>}
       onCreated={({ gl }) => { gl.domElement.addEventListener("webglcontextlost", onUnavailable, { once: true }); }}
       frameloop="demand"
@@ -416,7 +455,7 @@ export default function GalaxyScene({ repositories, onSelect, onHoldStart, onHol
       performance={{ min: 0.55 }}
       onPointerMissed={onBackgroundClick}
     >
-      <GalaxyContents repositories={repositories} onSelect={onSelect} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} reduceMotion={reduceMotion} />
+      <GalaxyContents repositories={repositories} selectedRepository={selectedRepository} onSelect={onSelect} onHoldStart={onHoldStart} onHoldPreview={onHoldPreview} onHoldEnd={onHoldEnd} reduceMotion={reduceMotion} />
     </Canvas>
   );
 }

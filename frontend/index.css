@@ -118,7 +118,7 @@ h1#intro-title { font-size: clamp(3rem, 6.5vw, 6.2rem); }
   .profile-header { padding: 14px 20px; flex-wrap: wrap; gap: 12px; }
   .top-actions { gap: 6px; }
   .top-actions > a, .top-actions > button { padding: 9px 11px; font-size: 11px; }
-  .intro-layout { inset: 83px 0 0; padding: 24px 20px; pointer-events: auto; }
+  .intro-layout { inset: 83px 0 0; padding: 24px 20px; }
   .profile-card { padding: 18px; }
   .project-drawer { top: 88px; bottom: 62px; }
 }
