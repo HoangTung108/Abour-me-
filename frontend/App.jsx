@@ -1,10 +1,11 @@
-import React, { Component, Suspense, lazy, useCallback, useEffect, useState } from "react";
+import React, { Component, Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, LazyMotion, MotionConfig, m as motion, useReducedMotion } from "framer-motion";
 import { ArrowUpRight, GitBranch, Orbit, Star, X, Sparkles, Code2, Layers, Gamepad2, Globe, Cpu } from "lucide-react";
 const GalaxyScene = lazy(() => import("./GalaxyScene.jsx"));
 const loadMotion = () => import("./motion-features.js").then(module => module.default);
 import { personalProfile } from "./profile.js";
 const GITHUB_USERNAME = "HoangTung108";
+const PROJECT_API_BASE = import.meta.env.VITE_PROJECT_API_BASE_URL ?? (window.location.hostname.endsWith(".github.io") ? null : "");
 class SceneBoundary extends Component {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
@@ -27,7 +28,13 @@ export default function App() {
     const id = window.setTimeout(() => setSceneReady(true), 250);
     return () => window.clearTimeout(id);
   }, []);
-  const [repositories, setRepositories] = useState([]);
+  const [githubRepositories, setGithubRepositories] = useState([]);
+  const [addedProjects, setAddedProjects] = useState([]);
+  const [projectApiError, setProjectApiError] = useState(false);
+  const repositories = useMemo(() => {
+    const githubUrls = new Set(githubRepositories.map(repository => repository.html_url.replace(/\/$/, "").toLowerCase()));
+    return [...githubRepositories, ...addedProjects.filter(project => !githubUrls.has(project.html_url.replace(/\/$/, "").toLowerCase()))];
+  }, [githubRepositories, addedProjects]);
   const [profile, setProfile] = useState(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -38,7 +45,6 @@ export default function App() {
   }, []);
   const [selectedRepository, setSelectedRepository] = useState(null);
   const [previewRepository, setPreviewRepository] = useState(null);
-  const [isHolding, setIsHolding] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const reduceMotion = useReducedMotion();
   const activeRepository = previewRepository || selectedRepository;
@@ -49,7 +55,7 @@ export default function App() {
     try {
       const cached = JSON.parse(sessionStorage.getItem(cacheKey));
       if (cached && Date.now() - cached.time < 300000 && Array.isArray(cached.data)) {
-        setRepositories(cached.data); setLoaded(true); return () => controller.abort();
+        setGithubRepositories(cached.data); setLoaded(true); return () => controller.abort();
       }
     } catch { /* Storage can be unavailable in private browsing. */ }
     fetch(`https://api.github.com/users/${GITHUB_USERNAME}/repos?per_page=100&sort=updated`, {
@@ -62,7 +68,7 @@ export default function App() {
       })
       .then((data) => {
         const publicRepositories = data.filter(repository => !repository.private);
-        setRepositories(publicRepositories); setLoaded(true);
+        setGithubRepositories(publicRepositories); setLoaded(true);
         try { sessionStorage.setItem(cacheKey, JSON.stringify({ time: Date.now(), data: publicRepositories })); } catch { /* Optional cache. */ }
       })
       .catch((error) => {
@@ -72,19 +78,48 @@ export default function App() {
     return () => controller.abort();
   }, []);
 
+  useEffect(() => {
+    if (PROJECT_API_BASE === null) return;
+    let controller;
+    let retryTimer;
+    const events = new EventSource(`${PROJECT_API_BASE}/api/projects/events`);
+    const refreshProjects = () => {
+      clearTimeout(retryTimer);
+      controller?.abort();
+      controller = new AbortController();
+      fetch(`${PROJECT_API_BASE}/api/projects`, { signal: controller.signal })
+        .then(response => {
+          if (!response.ok) throw new Error(`Project API returned ${response.status}`);
+          return response.json();
+        })
+        .then(data => {
+          if (!Array.isArray(data)) throw new Error("Invalid project API response");
+          setAddedProjects(data);
+          setProjectApiError(events.readyState !== EventSource.OPEN);
+        })
+        .catch(error => {
+          if (error.name !== "AbortError") {
+            console.error("Could not load added projects:", error);
+            setProjectApiError(true);
+            retryTimer = setTimeout(refreshProjects, 5000);
+          }
+        });
+    };
+    events.onmessage = refreshProjects;
+    events.onerror = () => setProjectApiError(true);
+    return () => {
+      controller?.abort();
+      clearTimeout(retryTimer);
+      events.close();
+    };
+  }, []);
+
   const selectRepository = useCallback((repository) => {
-    setIsHolding(false);
     setSelectedRepository((selected) => selected?.id === repository.id ? null : repository);
   }, []);
 
   const dismissRepository = useCallback(() => {
     setSelectedRepository(null);
-    setPreviewRepository(null);
-    setIsHolding(false);
-  }, []);
-  const beginHold = useCallback(() => setIsHolding(true), []);
-  const endHold = useCallback(() => {
-    setIsHolding(false);
     setPreviewRepository(null);
   }, []);
 
@@ -105,29 +140,15 @@ export default function App() {
           reduceMotion={Boolean(reduceMotion)} onUnavailable={unavailable}
           repositories={repositories}
           selectedRepository={selectedRepository}
+          previewRepository={previewRepository}
           onSelect={selectRepository}
-          onHoldStart={beginHold}
-          onHoldPreview={setPreviewRepository}
-          onHoldEnd={endHold}
+          onPreview={setPreviewRepository}
           onBackgroundClick={dismissRepository}
         /></Suspense></SceneBoundary>}
       </div>
 
       <div className="pointer-events-none absolute inset-0 z-1 bg-linear-to-r from-[#080a1b]/72 via-[#080a1b]/32 to-transparent md:from-[#080a1b]/68 md:via-[#080a1b]/16" />
       <div className="pointer-events-none absolute inset-0 z-1 bg-linear-to-t from-[#080a1b]/58 via-transparent to-[#080a1b]/25" />
-
-      <AnimatePresence>
-        {isHolding && (
-          <motion.div
-            className="pointer-events-none fixed bottom-7 left-1/2 z-20 -translate-x-1/2 rounded-full border border-cyan-100/20 bg-[#101329]/80 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 backdrop-blur-xl"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-          >
-            Hold to preview repository
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <motion.header
         className="profile-header"
@@ -194,15 +215,17 @@ export default function App() {
               </div>
             </div>
             <div className="personal-footer">
-              <span><span className="personal-status-dot" />{loadError ? 'Explore projects on GitHub' : loaded ? repositories.length + ` public project${repositories.length === 1 ? '' : 's'}` : 'Connecting to GitHub'}</span>
+              <span><span className="personal-status-dot" />{loadError ? `${repositories.length} project${repositories.length === 1 ? '' : 's'} · GitHub unavailable` : loaded ? repositories.length + ` public project${repositories.length === 1 ? '' : 's'}` : 'Connecting to GitHub'}</span>
               <a href={'https://github.com/' + GITHUB_USERNAME} target="_blank" rel="noreferrer">@{GITHUB_USERNAME}<ArrowUpRight size={13} /></a>
             </div>
+            {projectApiError && <p className="mt-2 text-[10px] text-amber-200/80" role="status">Added projects unavailable. Reconnecting…</p>}
+            {PROJECT_API_BASE === null && <p className="mt-2 text-[10px] text-amber-200/80" role="status">Additional projects require a configured backend.</p>}
           </article>
         </motion.div>
       </section>
       {showProjects && <section className="project-drawer" id="project-list" aria-label="Public projects">
         <div className="drawer-heading"><div><p>THE CONSTELLATION</p><h2>Explore my projects</h2></div><button onClick={() => setShowProjects(false)} aria-label="Close project list"><X size={18} /></button></div>
-        <div className="project-list">{repositories.map(repository => <button key={repository.id} onClick={() => { selectRepository(repository); setShowProjects(false); }}><span><strong>{repository.name}</strong><small>{repository.language || "Open source"}</small></span><ArrowUpRight size={16} /></button>)}</div>
+        <div className="project-list">{repositories.map(repository => <button key={repository.id} onClick={() => { selectRepository(repository); setShowProjects(false); }}><span><strong>{repository.name}</strong><small>{repository.language || (repository.source === "project" ? "Project link" : "Open source")}</small></span><ArrowUpRight size={16} /></button>)}</div>
         {!repositories.length && <p>{loadError ? "GitHub is unavailable. Visit the profile to explore projects." : loaded ? "No public projects yet." : "Loading projects…"}</p>}
       </section>}
       <AnimatePresence mode="wait">
@@ -228,7 +251,7 @@ export default function App() {
               <p className="mt-3 line-clamp-2 text-sm leading-6 text-indigo-100/65">{activeRepository.description || "No description provided."}</p>
               <div className="mt-4 flex items-center gap-4 font-mono text-[11px] text-white/55">
                 {activeRepository.language && <span className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-fuchsia-200" />{activeRepository.language}</span>}
-                <span className="flex items-center gap-1.5"><Star size={12} className="text-cyan-100" />{formatCount(activeRepository.stargazers_count)}</span>
+                {activeRepository.stargazers_count != null && <span className="flex items-center gap-1.5"><Star size={12} className="text-cyan-100" />{formatCount(activeRepository.stargazers_count)}</span>}
                 <span className="ml-auto text-cyan-100/75">Open project ↗</span>
               </div>
             </a>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { AdditiveBlending, BufferGeometry, Float32BufferAttribute } from "three";
 const ignoreRaycast = () => null;
@@ -281,60 +281,39 @@ function ShootingStar({ index, viewWidth, viewHeight }) {
   );
 }
 
-function RepositoryStars({ repositories, positions, selectedRepository, onSelect, onHoldStart, onHoldPreview, onHoldEnd }) {
-  const timer = useRef(null);
-  const held = useRef(false);
-  const pointerId = useRef(null);
-  const [pressedRepository, setPressedRepository] = useState(null);
-  const activeId = (pressedRepository || selectedRepository)?.id;
+function RepositoryStars({ repositories, positions, selectedRepository, previewRepository, onSelect, onPreview }) {
+  const activeId = (previewRepository || selectedRepository)?.id;
   const geometry = useMemo(() => {
     const result = new BufferGeometry();
     result.setAttribute("position", new Float32BufferAttribute(positions.flat(), 3));
-    result.setAttribute("size", new Float32BufferAttribute(repositories.map(repo => 38 + Math.min(Math.log2(repo.stargazers_count + 1) * 4, 20)), 1));
+    result.setAttribute("size", new Float32BufferAttribute(repositories.map(repo => 55 + Math.min(Math.log2((repo.stargazers_count ?? 0) + 1) * 4, 20)), 1));
     result.setAttribute("highlighted", new Float32BufferAttribute(repositories.map(repo => repo.id === activeId ? 1 : 0), 1));
     return result;
   }, [positions, repositories, activeId]);
   useEffect(() => () => geometry.dispose(), [geometry]);
-  useEffect(() => {
-    const finish = event => {
-      if (event.pointerId !== pointerId.current) return;
-      clearTimeout(timer.current);
-      pointerId.current = null;
-      setPressedRepository(null);
-      onHoldEnd();
-    };
-    window.addEventListener("pointerup", finish);
-    window.addEventListener("pointercancel", finish);
-    return () => {
-      window.removeEventListener("pointerup", finish);
-      window.removeEventListener("pointercancel", finish);
-      clearTimeout(timer.current);
-      document.body.style.cursor = "";
-    };
-  }, [onHoldEnd]);
+  useEffect(() => () => { document.body.style.cursor = ""; }, []);
+  const preview = event => {
+    if (event.pointerType === "touch") return;
+    event.stopPropagation();
+    const repository = repositories[event.index];
+    if (repository) {
+      document.body.style.cursor = "pointer";
+      onPreview(repository);
+    }
+  };
   return <points geometry={geometry}
-    onPointerOver={event => { event.stopPropagation(); document.body.style.cursor = "pointer"; }}
-    onPointerOut={() => {
-      document.body.style.cursor = "";
-      if (pointerId.current !== null) {
-        clearTimeout(timer.current);
-        pointerId.current = null;
-        held.current = true;
-        setPressedRepository(null);
-        onHoldEnd();
+    onPointerOver={preview}
+    onPointerMove={preview}
+    onPointerOut={event => {
+      const next = event.intersections.find(hit => hit.object === event.object);
+      if (next && event.pointerType !== "touch") {
+        onPreview(repositories[next.index] || null);
+      } else {
+        document.body.style.cursor = "";
+        onPreview(null);
       }
     }}
-    onPointerDown={event => {
-      if (event.button !== 0 || pointerId.current !== null) return;
-      event.stopPropagation(); held.current = false;
-      const repository = repositories[event.index];
-      if (!repository) return;
-      pointerId.current = event.pointerId;
-      setPressedRepository(repository);
-      onHoldStart();
-      timer.current = setTimeout(() => { held.current = true; onHoldPreview(repository); }, 460);
-    }}
-    onClick={event => { event.stopPropagation(); if (!held.current) onSelect(repositories[event.index]); held.current = false; }}>
+    onClick={event => { event.stopPropagation(); if (repositories[event.index]) onSelect(repositories[event.index]); }}>
     <shaderMaterial transparent depthWrite={false} blending={AdditiveBlending}
       vertexShader={`attribute float size; attribute float highlighted; varying float highlight;
         void main() { highlight = highlighted; vec4 p = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * p; gl_PointSize = size * (1.0 + highlighted * 0.55) * (19.0 / -p.z); }`}
@@ -367,7 +346,7 @@ function NebulaVeil() {
   </mesh>;
 }
 
-function GalaxyContents({ repositories, selectedRepository, onSelect, onHoldStart, onHoldPreview, onHoldEnd, reduceMotion }) {
+function GalaxyContents({ repositories, selectedRepository, previewRepository, onSelect, onPreview, reduceMotion }) {
   const { viewport, invalidate } = useThree();
   const galaxy = useRef(null);
   const farLayer = useRef(null);
@@ -434,20 +413,20 @@ function GalaxyContents({ repositories, selectedRepository, onSelect, onHoldStar
           <lineBasicMaterial color="#b9e8ff" transparent opacity={0.55} blending={AdditiveBlending} depthWrite={false} />
         </lineSegments>
       )}
-      <RepositoryStars repositories={repositories} positions={constellations.positions} selectedRepository={selectedRepository} onSelect={onSelect} onHoldStart={onHoldStart} onHoldPreview={onHoldPreview} onHoldEnd={onHoldEnd} />
+      <RepositoryStars repositories={repositories} positions={constellations.positions} selectedRepository={selectedRepository} previewRepository={previewRepository} onSelect={onSelect} onPreview={onPreview} />
       </group>
       <group ref={nearLayer}><DistantStars reduceMotion={reduceMotion} foreground /></group>
     </>
   );
 }
 
-export default function GalaxyScene({ repositories, selectedRepository, onSelect, onHoldStart, onHoldPreview, onHoldEnd, onBackgroundClick, reduceMotion, onUnavailable }) {
+export default function GalaxyScene({ repositories, selectedRepository, previewRepository, onSelect, onPreview, onBackgroundClick, reduceMotion, onUnavailable }) {
   return (
     <Canvas
       className="galaxy-canvas"
       camera={{ position: [0, 0, 19], fov: 52 }}
       dpr={1.5}
-      raycaster={{ params: { Points: { threshold: 0.3 } } }}
+      raycaster={{ params: { Points: { threshold: 0.42 } } }}
       fallback={<span className="sr-only">3D unavailable. Use the project list.</span>}
       onCreated={({ gl }) => { gl.domElement.addEventListener("webglcontextlost", onUnavailable, { once: true }); }}
       frameloop="demand"
@@ -455,7 +434,7 @@ export default function GalaxyScene({ repositories, selectedRepository, onSelect
       performance={{ min: 0.55 }}
       onPointerMissed={onBackgroundClick}
     >
-      <GalaxyContents repositories={repositories} selectedRepository={selectedRepository} onSelect={onSelect} onHoldStart={onHoldStart} onHoldPreview={onHoldPreview} onHoldEnd={onHoldEnd} reduceMotion={reduceMotion} />
+      <GalaxyContents repositories={repositories} selectedRepository={selectedRepository} previewRepository={previewRepository} onSelect={onSelect} onPreview={onPreview} reduceMotion={reduceMotion} />
     </Canvas>
   );
 }

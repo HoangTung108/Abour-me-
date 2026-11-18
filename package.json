@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --config ./vite.config.js --host 0.0.0.0 frontend",
     "build": "vite build frontend --config ./vite.config.js --outDir ../dist --emptyOutDir",
-    "preview": "vite preview --config ./vite.config.js --host 0.0.0.0"
+    "preview": "vite preview --config ./vite.config.js --host 0.0.0.0",
+    "start": "node backend/server.js",
+    "test": "node --test"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.5",
@@ -17,8 +19,10 @@
   "dependencies": {
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
+    "express": "^5.1.0",
     "framer-motion": "^14.14.0",
     "lucide-react": "^1.74.0",
+    "pg": "^8.16.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "three": "^0.187.0"
