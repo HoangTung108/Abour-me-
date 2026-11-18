@@ -1,6 +1,6 @@
 import React, { Component, Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { AnimatePresence, LazyMotion, MotionConfig, m as motion, useReducedMotion } from "framer-motion";
-import { ArrowUpRight, GitBranch, Orbit, Star, X, Sparkles, Leaf, List } from "lucide-react";
+import { ArrowUpRight, GitBranch, Orbit, Star, X, Sparkles, MapPin, Code2 } from "lucide-react";
 const GalaxyScene = lazy(() => import("./GalaxyScene.jsx"));
 const loadMotion = () => import("./motion-features.js").then(module => module.default);
 const GITHUB_USERNAME = "HoangTung108";
@@ -20,18 +20,31 @@ export default function App() {
   const [sceneUnavailable, setSceneUnavailable] = useState(false);
   const [showProjects, setShowProjects] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [lowPower, setLowPower] = useState(() => window.matchMedia("(max-width: 700px)").matches || navigator.deviceMemory <= 4 || navigator.connection?.saveData);
   const unavailable = useCallback(() => setSceneUnavailable(true), []);
   useEffect(() => {
     const id = window.setTimeout(() => setSceneReady(true), 250);
     return () => window.clearTimeout(id);
   }, []);
   const [repositories, setRepositories] = useState([]);
+  const [profile, setProfile] = useState(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('https://api.github.com/users/' + GITHUB_USERNAME, { signal: controller.signal })
+      .then(response => { if (!response.ok) throw new Error('Profile unavailable'); return response.json(); })
+      .then(setProfile).catch(() => { /* Local introduction remains available. */ });
+    return () => controller.abort();
+  }, []);
   const [selectedRepository, setSelectedRepository] = useState(null);
   const [isHolding, setIsHolding] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const reduceMotion = useReducedMotion();
   const activeRepository = selectedRepository;
+  const languageCounts = repositories.reduce((counts, repository) => {
+    if (repository.language) counts[repository.language] = (counts[repository.language] || 0) + 1;
+    return counts;
+  }, {});
+  const languageTotal = Object.values(languageCounts).reduce((sum, count) => sum + count, 0);
+  const skills = Object.entries(languageCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -86,11 +99,10 @@ export default function App() {
   return (
     <LazyMotion features={loadMotion} strict><MotionConfig reducedMotion="user">
     <main className="fixed inset-0 overflow-hidden bg-[#070916] text-white selection:bg-fuchsia-200 selection:text-indigo-950">
-      <div className="orbital-rings" aria-hidden="true"><span /><span /><span /></div>
       <div className="cosmic-wash" aria-hidden="true" />
       <div className="absolute inset-0 z-0" aria-hidden="true">
         {sceneReady && !sceneUnavailable && <SceneBoundary onUnavailable={unavailable}><Suspense fallback={null}><GalaxyScene
-          lowPower={Boolean(lowPower)} reduceMotion={Boolean(reduceMotion || lowPower)} onUnavailable={unavailable}
+          reduceMotion={Boolean(reduceMotion)} onUnavailable={unavailable}
           repositories={repositories}
           onSelect={selectRepository}
           onHoldStart={beginHold}
@@ -116,32 +128,34 @@ export default function App() {
       </AnimatePresence>
 
       <motion.header
-        className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-6 py-6 sm:px-10 lg:px-16"
+        className="profile-header"
         initial={reduceMotion ? false : { opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: "easeOut" }}
       >
         <a href={`https://github.com/${GITHUB_USERNAME}`} target="_blank" rel="noreferrer" className="group flex items-center gap-3" aria-label="Visit GitHub profile">
           <span className="flex size-10 items-center justify-center rounded-full border border-white/15 bg-white/6 text-cyan-100 shadow-[0_0_24px_rgba(153,196,255,0.12)] transition group-hover:border-fuchsia-200/50 group-hover:shadow-[0_0_30px_rgba(255,155,209,0.25)]"><Orbit size={19} /></span>
-          <span className="font-display text-sm font-semibold tracking-[0.16em] text-white/85">HT<span className="text-fuchsia-300">.</span></span>
+          <span className="font-display text-sm font-semibold tracking-[0.16em] text-white/85">HwangT<span className="text-fuchsia-300">.</span></span>
         </a>
-        <a href={`https://github.com/${GITHUB_USERNAME}`} target="_blank" rel="noreferrer" className="hidden items-center gap-2 rounded-full border border-white/15 bg-white/4.5 px-4 py-2 text-sm text-white/70 backdrop-blur-md transition hover:border-cyan-200/40 hover:text-white sm:flex">
-          <GitBranch size={16} /> GitHub <ArrowUpRight size={14} />
-        </a>
+        <nav className="top-actions" aria-label="Main navigation">
+          <button className="explore-button" onClick={() => setShowProjects(value => !value)} aria-expanded={showProjects} aria-controls="project-list"><Sparkles size={15} /> Projects</button>
+          <a href={'https://github.com/' + GITHUB_USERNAME} target="_blank" rel="noreferrer"><GitBranch size={15} /> GitHub <ArrowUpRight size={14} /></a>
+        </nav>
       </motion.header>
 
-      <section className="pointer-events-none absolute inset-0 z-10 flex items-center px-6 pb-12 pt-24 sm:px-10 sm:pb-16 lg:px-16" aria-labelledby="intro-title">
+      <section className="intro-layout" aria-labelledby="intro-title">
         <motion.div
-          className="pointer-events-none max-w-165"
+          className="intro-content"
           initial={reduceMotion ? false : { opacity: 0, y: 28 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, delay: 0.12, ease: [0.2, 0.7, 0.2, 1] }}
         >
           <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-cyan-200/20 bg-cyan-200/6 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/85 backdrop-blur-md">
             <span className="relative flex size-1.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-cyan-200 opacity-70" /><span className="relative inline-flex size-1.5 rounded-full bg-cyan-200" /></span>
-            Software developer · Vietnam
+            Personal portfolio / GitHub connected
           </div>
 
+          <p className="intro-eyebrow">HELLO, I AM {profile?.name || GITHUB_USERNAME}</p>
           <h1 id="intro-title" className="font-display text-[clamp(3.35rem,8vw,7.3rem)] font-medium leading-[0.91] tracking-[-0.075em] text-white drop-shadow-[0_4px_35px_rgba(11,11,34,0.6)]">
             My work,<br />written in <span className="cosmic-gradient">starlight.</span>
           </h1>
@@ -150,12 +164,35 @@ export default function App() {
             A little curiosity. A lot of code. Explore the constellation of things I build — every star is a project with a story.
           </p>
 
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <button className="explore-button pointer-events-auto" onClick={() => setShowProjects(value => !value)} aria-expanded={showProjects} aria-controls="project-list"><Sparkles size={16} /> Explore projects <ArrowUpRight size={16} /></button>
-            <a href={`https://github.com/${GITHUB_USERNAME}`} target="_blank" rel="noreferrer" className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/4.5 px-5 py-3 text-sm font-medium text-white/80 backdrop-blur-md transition hover:border-fuchsia-200/40 hover:bg-white/10 hover:text-white">
-              <GitBranch size={16} /> GitHub profile <ArrowUpRight size={15} />
-            </a>
-          </div>
+          <article className="profile-card" aria-label="About me">
+            <div className="profile-identity">
+              <div className="profile-avatar">{profile?.avatar_url ? <img src={profile.avatar_url} alt="" width="52" height="52" /> : <Code2 size={25} />}</div>
+              <div><h2>{profile?.name || GITHUB_USERNAME}</h2><p>@{GITHUB_USERNAME}</p></div>
+              <span className="profile-tag">ABOUT ME</span>
+            </div>
+            <p className="profile-bio">{profile?.bio || "Welcome to my personal corner of the internet. Explore the projects I build, the code behind them, and what I am working on through GitHub."}</p>
+            <div className="profile-details">
+              {profile?.location && <span><MapPin size={13} />{profile.location}</span>}
+              <span><Code2 size={13} />{loaded && !loadError ? repositories.length + ' public repositories' : 'Projects & experiments'}</span>
+              {profile && <span><GitBranch size={13} />{formatCount(profile.followers)} followers</span>}
+            </div>
+            <section className="skills-panel" aria-labelledby="skills-title">
+              <div className="skills-heading"><h3 id="skills-title">Skills & technologies</h3><Code2 size={14} /></div>
+              <p className="skills-caption">Share of repositories by primary language, not proficiency.</p>
+              <div className="skills-grid">
+                {skills.map(([language, count]) => {
+                  const percentage = Math.round(count / languageTotal * 100);
+                  return <div className="skill-item" key={language}>
+                    <div className="skill-label"><span>{language}</span><span>{percentage}%</span></div>
+                    <div className="skill-track" role="meter" aria-label={language + ' repository share'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage} aria-valuetext={count + ' of ' + languageTotal + ' repositories with a primary language'}>
+                      <motion.span initial={reduceMotion ? false : { scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.8, ease: 'easeOut' }} style={{ width: percentage + '%' }} />
+                    </div>
+                  </div>;
+                })}
+              </div>
+              {!skills.length && <p className="skills-caption" role="status">{loadError ? 'Language data is temporarily unavailable.' : loaded ? 'No language data available yet.' : 'Loading skills from GitHub...'}</p>}
+            </section>
+          </article>
 
           <div className="mt-9 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.15em] text-indigo-100/45">
             <span className="flex size-6 items-center justify-center rounded-full border border-white/10"><Star size={11} /></span>
@@ -163,14 +200,6 @@ export default function App() {
           </div>
         </motion.div>
       </section>
-
-      <footer className="space-footer">
-        <span className="space-caption"><span className="status-dot" /> A PERSONAL UNIVERSE <span className="footer-divider">/</span> EST. ON EARTH</span>
-        <div className="scene-controls">
-          <button onClick={() => setShowProjects(value => !value)} aria-expanded={showProjects} aria-controls="project-list"><List size={14} /> Projects</button>
-          <button onClick={() => setLowPower(value => !value)} aria-pressed={Boolean(lowPower)}><Leaf size={14} /> {lowPower ? "Eco" : "Full detail"}</button>
-        </div>
-      </footer>
       <div className="orbit-label" aria-hidden="true"><span>THE PROJECT CONSTELLATION</span><span>CLICK A STAR TO DISCOVER</span></div>
       {showProjects && <section className="project-drawer" id="project-list" aria-label="Public projects">
         <div className="drawer-heading"><div><p>THE CONSTELLATION</p><h2>Explore my projects</h2></div><button onClick={() => setShowProjects(false)} aria-label="Close project list"><X size={18} /></button></div>
