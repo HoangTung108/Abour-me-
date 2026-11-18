@@ -155,14 +155,10 @@ export default function App() {
             Personal portfolio / GitHub connected
           </div>
 
-          <p className="intro-eyebrow">HELLO, I AM {profile?.name || GITHUB_USERNAME}</p>
+          <p className="intro-eyebrow">HI, I AM HWANG</p>
           <h1 id="intro-title" className="font-display text-[clamp(3.35rem,8vw,7.3rem)] font-medium leading-[0.91] tracking-[-0.075em] text-white drop-shadow-[0_4px_35px_rgba(11,11,34,0.6)]">
-            My work,<br />written in <span className="cosmic-gradient">starlight.</span>
+            Tell me,<br />what do you wanna create ?
           </h1>
-
-          <p className="mt-7 max-w-117.5 text-sm leading-7 text-indigo-100/70 sm:text-base sm:leading-8">
-            A little curiosity. A lot of code. Explore the constellation of things I build — every star is a project with a story.
-          </p>
 
           <article className="profile-card" aria-label="About me">
             <div className="profile-identity">
@@ -200,7 +196,6 @@ export default function App() {
           </div>
         </motion.div>
       </section>
-      <div className="orbit-label" aria-hidden="true"><span>THE PROJECT CONSTELLATION</span><span>CLICK A STAR TO DISCOVER</span></div>
       {showProjects && <section className="project-drawer" id="project-list" aria-label="Public projects">
         <div className="drawer-heading"><div><p>THE CONSTELLATION</p><h2>Explore my projects</h2></div><button onClick={() => setShowProjects(false)} aria-label="Close project list"><X size={18} /></button></div>
         <div className="project-list">{repositories.map(repository => <button key={repository.id} onClick={() => { selectRepository(repository); setShowProjects(false); }}><span><strong>{repository.name}</strong><small>{repository.language || "Open source"}</small></span><ArrowUpRight size={16} /></button>)}</div>
