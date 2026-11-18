@@ -47,3 +47,18 @@ test("handles empty and single-project layouts", () => {
   assert.equal(single.positions.length, 1);
   assert.equal(single.connectionPositions.length, 0);
 });
+
+test("connects stars within their original constellations", () => {
+  const count = 17;
+  const result = layout(count, 1260, 687);
+  const clusterCount = Math.ceil(count / 4);
+  const findIndex = offset => result.positions.findIndex(point =>
+    point.every((value, dimension) => Math.abs(value - result.connectionPositions[offset + dimension]) < 1e-5),
+  );
+  for (let offset = 0; offset < result.connectionPositions.length; offset += 6) {
+    const start = findIndex(offset);
+    const end = findIndex(offset + 3);
+    assert.ok(start >= 0 && end >= 0);
+    assert.equal(Math.floor(start * clusterCount / count), Math.floor(end * clusterCount / count));
+  }
+});

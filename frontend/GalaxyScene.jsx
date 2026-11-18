@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Line } from "@react-three/drei";
 import { AdditiveBlending, BufferGeometry, Float32BufferAttribute } from "three";
 import { createConstellations, seededRandom } from "./constellations.js";
 const ignoreRaycast = () => null;
@@ -297,12 +298,13 @@ function GalaxyContents({ repositories, selectedRepository, previewRepository, o
   useEffect(() => {
     raycaster.params.Points.threshold = Math.min(0.42, constellations.spacing * 0.45 * viewport.width / size.width);
   }, [raycaster, constellations.spacing, viewport.width, size.width]);
-  const connectionGeometry = useMemo(() => {
-    const geometry = new BufferGeometry();
-    geometry.setAttribute("position", new Float32BufferAttribute(constellations.connectionPositions, 3));
-    return geometry;
+  const connectionPoints = useMemo(() => {
+    const points = [];
+    for (let index = 0; index < constellations.connectionPositions.length; index += 3) {
+      points.push(Array.from(constellations.connectionPositions.slice(index, index + 3)));
+    }
+    return points;
   }, [constellations.connectionPositions]);
-  useEffect(() => () => connectionGeometry.dispose(), [connectionGeometry]);
   useEffect(() => {
     if (reduceMotion) return;
     const trackPointer = event => {
@@ -346,10 +348,9 @@ function GalaxyContents({ repositories, selectedRepository, previewRepository, o
         <GalaxyCore swirl={swirl} />
       </group>
       {!reduceMotion && [0, 1, 2].map(index => <ShootingStar key={index} index={index} viewWidth={viewport.width} viewHeight={viewport.height} />)}
-      {constellations.connectionPositions.length > 0 && (
-        <lineSegments geometry={connectionGeometry} raycast={ignoreRaycast}>
-          <lineBasicMaterial color="#b9e8ff" transparent opacity={0.55} blending={AdditiveBlending} depthWrite={false} />
-        </lineSegments>
+      {connectionPoints.length > 0 && (
+        <Line points={connectionPoints} segments color="#d5f2ff" lineWidth={2.2}
+          transparent opacity={0.85} blending={AdditiveBlending} depthWrite={false} raycast={ignoreRaycast} />
       )}
       <RepositoryStars repositories={repositories} positions={constellations.positions} spacing={constellations.spacing} selectedRepository={selectedRepository} previewRepository={previewRepository} onSelect={onSelect} onPreview={onPreview} />
       </group>
