@@ -366,7 +366,7 @@ function GalaxyContents({ repositories, onSelect, onHoldStart, onHoldEnd, reduce
   useFrame((state, delta) => {
     if (!galaxy.current || reduceMotion || document.hidden) return;
     // Slow continuous orbit; capped delta avoids jumping after an inactive tab.
-    swirl.value += Math.min(delta, 0.05) * 0.55;
+    swirl.value += Math.min(delta, 0.05) * 0.225;
     const smoothing = 1 - Math.exp(-Math.min(delta, 0.05) * 2.5);
     galaxy.current.rotation.y += (pointer.current.x * 0.035 - galaxy.current.rotation.y) * smoothing;
     galaxy.current.rotation.x += (-pointer.current.y * 0.025 - galaxy.current.rotation.x) * smoothing;
