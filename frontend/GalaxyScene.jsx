@@ -350,14 +350,14 @@ function GalaxyContents({ repositories, selectedRepository, previewRepository, o
       {!reduceMotion && [0, 1, 2].map(index => <ShootingStar key={index} index={index} viewWidth={viewport.width} viewHeight={viewport.height} />)}
       {connectionPoints.length > 0 && (
         <>
-          <Line points={connectionPoints} segments color="#80cfff" lineWidth={18}
-            transparent opacity={0.06} blending={AdditiveBlending} depthWrite={false} raycast={ignoreRaycast} />
-          <Line points={connectionPoints} segments color="#96dfff" lineWidth={10}
-            transparent opacity={0.13} blending={AdditiveBlending} depthWrite={false} raycast={ignoreRaycast} />
-          <Line points={connectionPoints} segments color="#b5e9ff" lineWidth={5}
-            transparent opacity={0.24} blending={AdditiveBlending} depthWrite={false} raycast={ignoreRaycast} />
-          <Line points={connectionPoints} segments color="#d5f2ff" lineWidth={2.2}
-            transparent opacity={0.85} blending={AdditiveBlending} depthWrite={false} raycast={ignoreRaycast} />
+          <Line points={connectionPoints} segments color="#80cfff" lineWidth={12}
+            transparent opacity={0.035} blending={AdditiveBlending} depthWrite={false} raycast={ignoreRaycast} />
+          <Line points={connectionPoints} segments color="#96dfff" lineWidth={7}
+            transparent opacity={0.075} blending={AdditiveBlending} depthWrite={false} raycast={ignoreRaycast} />
+          <Line points={connectionPoints} segments color="#b5e9ff" lineWidth={3}
+            transparent opacity={0.14} blending={AdditiveBlending} depthWrite={false} raycast={ignoreRaycast} />
+          <Line points={connectionPoints} segments color="#d5f2ff" lineWidth={1.1}
+            transparent opacity={0.9} blending={AdditiveBlending} depthWrite={false} raycast={ignoreRaycast} />
         </>
       )}
       <RepositoryStars repositories={repositories} positions={constellations.positions} spacing={constellations.spacing} selectedRepository={selectedRepository} previewRepository={previewRepository} onSelect={onSelect} onPreview={onPreview} />
