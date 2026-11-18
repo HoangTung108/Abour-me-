@@ -4,6 +4,8 @@ import { ArrowUpRight, GitBranch, Orbit, Star, X, Sparkles, Code2, Layers, Gamep
 const GalaxyScene = lazy(() => import("./GalaxyScene.jsx"));
 const loadMotion = () => import("./motion-features.js").then(module => module.default);
 import { personalProfile } from "./profile.js";
+import { loadGithubRepositories } from "./github-repositories.js";
+import repositorySnapshot from "./repositories.json";
 const GITHUB_USERNAME = "HoangTung108";
 const PROJECT_API_BASE = import.meta.env.VITE_PROJECT_API_BASE_URL ?? (window.location.hostname.endsWith(".github.io") ? null : "");
 class SceneBoundary extends Component {
@@ -28,7 +30,7 @@ export default function App() {
     const id = window.setTimeout(() => setSceneReady(true), 250);
     return () => window.clearTimeout(id);
   }, []);
-  const [githubRepositories, setGithubRepositories] = useState([]);
+  const [githubRepositories, setGithubRepositories] = useState(repositorySnapshot);
   const [addedProjects, setAddedProjects] = useState([]);
   const [projectApiError, setProjectApiError] = useState(false);
   const repositories = useMemo(() => {
@@ -50,29 +52,21 @@ export default function App() {
   const activeRepository = previewRepository || selectedRepository;
   useEffect(() => {
     const controller = new AbortController();
-
-    const cacheKey = "github-repositories-v1";
+    let storage;
     try {
-      const cached = JSON.parse(sessionStorage.getItem(cacheKey));
-      if (cached && Date.now() - cached.time < 300000 && Array.isArray(cached.data)) {
-        setGithubRepositories(cached.data); setLoaded(true); return () => controller.abort();
-      }
+      storage = window.localStorage;
     } catch { /* Storage can be unavailable in private browsing. */ }
-    fetch(`https://api.github.com/users/${GITHUB_USERNAME}/repos?per_page=100&sort=updated`, {
-      headers: { Accept: "application/vnd.github+json" },
-      signal: controller.signal,
-    })
-      .then((response) => {
-        if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
-        return response.json();
-      })
-      .then((data) => {
-        const publicRepositories = data.filter(repository => !repository.private);
-        setGithubRepositories(publicRepositories); setLoaded(true);
-        try { sessionStorage.setItem(cacheKey, JSON.stringify({ time: Date.now(), data: publicRepositories })); } catch { /* Optional cache. */ }
+    loadGithubRepositories({ username: GITHUB_USERNAME, storage, signal: controller.signal })
+      .then(({ repositories: data, error }) => {
+        setGithubRepositories(data);
+        setLoaded(true);
+        if (error) {
+          console.warn("Using saved GitHub projects:", error);
+          setLoadError(true);
+        }
       })
       .catch((error) => {
-        if (error.name !== "AbortError") { setLoadError(true); setLoaded(true); }
+        if (error.name !== "AbortError") console.error("Could not load GitHub projects:", error);
       });
 
     return () => controller.abort();
@@ -215,7 +209,7 @@ export default function App() {
               </div>
             </div>
             <div className="personal-footer">
-              <span><span className="personal-status-dot" />{loadError ? `${repositories.length} project${repositories.length === 1 ? '' : 's'} · GitHub unavailable` : loaded ? repositories.length + ` public project${repositories.length === 1 ? '' : 's'}` : 'Connecting to GitHub'}</span>
+              <span><span className="personal-status-dot" />{loadError ? `${repositories.length} project${repositories.length === 1 ? '' : 's'} · Saved GitHub data` : loaded ? repositories.length + ` public project${repositories.length === 1 ? '' : 's'}` : 'Connecting to GitHub'}</span>
               <a href={'https://github.com/' + GITHUB_USERNAME} target="_blank" rel="noreferrer">@{GITHUB_USERNAME}<ArrowUpRight size={13} /></a>
             </div>
             {projectApiError && <p className="mt-2 text-[10px] text-amber-200/80" role="status">Added projects unavailable. Reconnecting…</p>}
