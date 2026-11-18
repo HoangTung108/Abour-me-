@@ -1,8 +1,9 @@
 import React, { Component, Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { AnimatePresence, LazyMotion, MotionConfig, m as motion, useReducedMotion } from "framer-motion";
-import { ArrowUpRight, GitBranch, Orbit, Star, X, Sparkles, MapPin, Code2 } from "lucide-react";
+import { ArrowUpRight, GitBranch, Orbit, Star, X, Sparkles, Code2, Layers, Gamepad2, Globe, Cpu } from "lucide-react";
 const GalaxyScene = lazy(() => import("./GalaxyScene.jsx"));
 const loadMotion = () => import("./motion-features.js").then(module => module.default);
+import { personalProfile } from "./profile.js";
 const GITHUB_USERNAME = "HoangTung108";
 class SceneBoundary extends Component {
   state = { failed: false };
@@ -19,6 +20,7 @@ export default function App() {
   const [sceneReady, setSceneReady] = useState(false);
   const [sceneUnavailable, setSceneUnavailable] = useState(false);
   const [showProjects, setShowProjects] = useState(false);
+  const [profileTab, setProfileTab] = useState("about");
   const [loaded, setLoaded] = useState(false);
   const unavailable = useCallback(() => setSceneUnavailable(true), []);
   useEffect(() => {
@@ -39,13 +41,6 @@ export default function App() {
   const [loadError, setLoadError] = useState(false);
   const reduceMotion = useReducedMotion();
   const activeRepository = selectedRepository;
-  const languageCounts = repositories.reduce((counts, repository) => {
-    if (repository.language) counts[repository.language] = (counts[repository.language] || 0) + 1;
-    return counts;
-  }, {});
-  const languageTotal = Object.values(languageCounts).reduce((sum, count) => sum + count, 0);
-  const skills = Object.entries(languageCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
-
   useEffect(() => {
     const controller = new AbortController();
 
@@ -150,50 +145,50 @@ export default function App() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, delay: 0.12, ease: [0.2, 0.7, 0.2, 1] }}
         >
-          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-cyan-200/20 bg-cyan-200/6 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-100/85 backdrop-blur-md">
-            <span className="relative flex size-1.5"><span className="absolute inline-flex size-full animate-ping rounded-full bg-cyan-200 opacity-70" /><span className="relative inline-flex size-1.5 rounded-full bg-cyan-200" /></span>
-            Personal portfolio / GitHub connected
+          <div className="personal-heading">
+            <p className="intro-eyebrow"><span /> PERSONAL SPACE / PORTFOLIO</p>
+            <h1 id="intro-title">Xin chào, mình là<br /><span className="cosmic-gradient">{personalProfile.name}.</span></h1>
+            <p className="personal-tagline">Ý tưởng của bạn. Trải nghiệm chúng ta cùng tạo ra.</p>
           </div>
 
-          <p className="intro-eyebrow">HI, I AM HWANG</p>
-          <h1 id="intro-title" className="font-display text-[clamp(3.35rem,8vw,7.3rem)] font-medium leading-[0.91] tracking-[-0.075em] text-white drop-shadow-[0_4px_35px_rgba(11,11,34,0.6)]">
-            Tell me,<br />what do you wanna create ?
-          </h1>
+          <article className="personal-card" aria-label="Hồ sơ cá nhân">
+            <div className="personal-identity">
+              <div className="personal-avatar">{profile?.avatar_url ? <img src={profile.avatar_url} alt="" width="60" height="60" /> : <Code2 size={27} />}<span /></div>
+              <div><h2>{profile?.name || personalProfile.name}</h2><p>{personalProfile.role}</p></div>
+              <span className="personal-monogram" aria-hidden="true">&lt;/&gt;</span>
+            </div>
+            <div className="personal-tabs" role="tablist" aria-label="Thông tin profile">
+              {[['about', 'Giới thiệu'], ['skills', 'Kỹ năng']].map(([id, label]) => <button key={id} id={'tab-' + id} role="tab" aria-selected={profileTab === id} aria-controls={'panel-' + id} tabIndex={profileTab === id ? 0 : -1} onClick={() => setProfileTab(id)} onKeyDown={event => {
+                if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+                  event.preventDefault();
+                  const next = event.key === 'Home' ? 'about' : event.key === 'End' ? 'skills' : id === 'about' ? 'skills' : 'about';
+                  setProfileTab(next); document.getElementById('tab-' + next)?.focus();
+                }
+              }}>{id === 'about' ? <Layers size={14} /> : <Code2 size={14} />}{label}</button>)}
+            </div>
 
-          <article className="profile-card" aria-label="About me">
-            <div className="profile-identity">
-              <div className="profile-avatar">{profile?.avatar_url ? <img src={profile.avatar_url} alt="" width="52" height="52" /> : <Code2 size={25} />}</div>
-              <div><h2>{profile?.name || GITHUB_USERNAME}</h2><p>@{GITHUB_USERNAME}</p></div>
-              <span className="profile-tag">ABOUT ME</span>
-            </div>
-            <p className="profile-bio">{profile?.bio || "Welcome to my personal corner of the internet. Explore the projects I build, the code behind them, and what I am working on through GitHub."}</p>
-            <div className="profile-details">
-              {profile?.location && <span><MapPin size={13} />{profile.location}</span>}
-              <span><Code2 size={13} />{loaded && !loadError ? repositories.length + ' public repositories' : 'Projects & experiments'}</span>
-              {profile && <span><GitBranch size={13} />{formatCount(profile.followers)} followers</span>}
-            </div>
-            <section className="skills-panel" aria-labelledby="skills-title">
-              <div className="skills-heading"><h3 id="skills-title">Skills & technologies</h3><Code2 size={14} /></div>
-              <p className="skills-caption">Share of repositories by primary language, not proficiency.</p>
-              <div className="skills-grid">
-                {skills.map(([language, count]) => {
-                  const percentage = Math.round(count / languageTotal * 100);
-                  return <div className="skill-item" key={language}>
-                    <div className="skill-label"><span>{language}</span><span>{percentage}%</span></div>
-                    <div className="skill-track" role="meter" aria-label={language + ' repository share'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage} aria-valuetext={count + ' of ' + languageTotal + ' repositories with a primary language'}>
-                      <motion.span initial={reduceMotion ? false : { scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.8, ease: 'easeOut' }} style={{ width: percentage + '%' }} />
-                    </div>
-                  </div>;
-                })}
+            <div className="personal-panel">
+              <div className="about-panel" id="panel-about" role="tabpanel" aria-labelledby="tab-about" tabIndex={0} hidden={profileTab !== "about"}>
+                <p className="personal-intro">{personalProfile.intro}</p>
+                <p className="personal-detail">{personalProfile.detail}</p>
+                <div className="focus-grid" aria-label="Lĩnh vực chuyên môn">
+                  {[Layers, Gamepad2, Globe, Cpu].map((Icon, index) => <div key={personalProfile.areas[index]}><Icon size={17} /><span>{personalProfile.areas[index]}</span></div>)}
+                </div>
+              </div><div className="expertise-panel" id="panel-skills" role="tabpanel" aria-labelledby="tab-skills" tabIndex={0} hidden={profileTab !== "skills"}>
+                <p className="expertise-caption">NGÔN NGỮ CHỦ ĐẠO <span>Tự đánh giá</span></p>
+                {personalProfile.skills.map(skill => <div className="expertise-row" key={skill.name} style={{ '--skill-color': skill.color }}>
+                  <span className="expertise-mark">{skill.mark}</span>
+                  <div className="expertise-info"><h3>{skill.name}</h3><p>{skill.context}</p></div>
+                  <span className="expertise-level">{skill.level}</span>
+                </div>)}
+                <p className="embedded-note"><Cpu size={14} /><span><strong>Hệ thống nhúng</strong> · Kiến thức bổ trợ</span></p>
               </div>
-              {!skills.length && <p className="skills-caption" role="status">{loadError ? 'Language data is temporarily unavailable.' : loaded ? 'No language data available yet.' : 'Loading skills from GitHub...'}</p>}
-            </section>
+            </div>
+            <div className="personal-footer">
+              <span><span className="personal-status-dot" />{loadError ? 'Khám phá dự án trên GitHub' : loaded ? repositories.length + ' dự án công khai' : 'Đang kết nối GitHub'}</span>
+              <a href={'https://github.com/' + GITHUB_USERNAME} target="_blank" rel="noreferrer">@{GITHUB_USERNAME}<ArrowUpRight size={13} /></a>
+            </div>
           </article>
-
-          <div className="mt-9 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.15em] text-indigo-100/45">
-            <span className="flex size-6 items-center justify-center rounded-full border border-white/10"><Star size={11} /></span>
-            {loadError ? "GitHub is temporarily unavailable" : repositories.length ? `${repositories.length} public projects in orbit` : loaded ? "No public projects yet" : "Connecting to GitHub"}
-          </div>
         </motion.div>
       </section>
       {showProjects && <section className="project-drawer" id="project-list" aria-label="Public projects">
