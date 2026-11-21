@@ -11,7 +11,7 @@ export default function ProfileHeader({ username, reduceMotion, showProjects, on
     >
       <a href={`https://github.com/${username}`} target="_blank" rel="noreferrer" className="group flex items-center gap-3" aria-label="Visit GitHub profile">
         <span className="flex size-10 items-center justify-center rounded-full border border-white/15 bg-white/6 text-cyan-100 shadow-[0_0_24px_rgba(153,196,255,0.12)] transition group-hover:border-fuchsia-200/50 group-hover:shadow-[0_0_30px_rgba(255,155,209,0.25)]"><Orbit size={19} /></span>
-        <span className="font-display text-sm font-semibold tracking-[0.16em] text-white/85">HwangT<span className="text-fuchsia-300">.</span></span>
+        <span className="font-display text-sm font-semibold tracking-[0.16em] text-cyan-200">HwangT<span className="text-fuchsia-300">.</span></span>
       </a>
       <nav className="top-actions" aria-label="Main navigation">
         <button className="explore-button" onClick={onToggleProjects} aria-expanded={showProjects} aria-controls="project-list"><Sparkles size={15} /> Projects</button>
