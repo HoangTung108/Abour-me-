@@ -1,9 +1,30 @@
 import { useState } from "react";
 import { m as motion } from "framer-motion";
-import { ArrowUpRight, Code2, Cpu, Gamepad2, Globe, Layers, Star } from "lucide-react";
+import { ArrowUpRight, Briefcase, Code2, Cpu, Gamepad2, GraduationCap, Layers, Trophy } from "lucide-react";
 import { personalProfile } from "../profile.js";
 
-export default function ProfileIntro({ username, profile, reduceMotion, projectCount, loaded, loadError, projectApiError, hasProjectApi }) {
+const tabs = [
+  { id: "about", label: "About", Icon: Layers },
+  { id: "skills", label: "Skills", Icon: Code2 },
+  { id: "work", label: "Work", Icon: Briefcase },
+  { id: "awards", label: "Awards", Icon: Trophy },
+];
+
+function ProfileEntries({ entries }) {
+  return (
+    <ul className="profile-entries">
+      {entries.map(({ title, subtitle, description }) => (
+        <li key={title}>
+          <h3>{title}</h3>
+          {subtitle && <p>{subtitle}</p>}
+          {description && <p>{description}</p>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export default function ProfileIntro({ username, reduceMotion, projectCount, loaded, loadError, projectApiError, hasProjectApi }) {
   const [profileTab, setProfileTab] = useState("about");
   const [avatarUnavailable, setAvatarUnavailable] = useState(false);
 
@@ -23,17 +44,29 @@ export default function ProfileIntro({ username, profile, reduceMotion, projectC
         <article className="personal-card" aria-label="Personal profile">
           <div className="personal-identity">
             <div className="personal-avatar">{avatarUnavailable ? <Code2 size={27} /> : <img src={`https://github.com/${username}.png?size=120`} alt="" width="60" height="60" onError={() => { console.warn("Could not load GitHub avatar"); setAvatarUnavailable(true); }} />}<span /></div>
-            <div><h2>{profile?.name || personalProfile.name}</h2><p>{personalProfile.role}</p></div>
+            <div><h2>{personalProfile.name}</h2><p>{personalProfile.role}</p></div>
             <span className="personal-monogram" aria-hidden="true">&lt;/&gt;</span>
           </div>
           <div className="personal-tabs" role="tablist" aria-label="Profile information">
-            {[['about', 'About'], ['skills', 'Skills']].map(([id, label]) => <button key={id} id={'tab-' + id} role="tab" aria-selected={profileTab === id} aria-controls={'panel-' + id} tabIndex={profileTab === id ? 0 : -1} onClick={() => setProfileTab(id)} onKeyDown={event => {
-              if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
-                event.preventDefault();
-                const next = event.key === 'Home' ? 'about' : event.key === 'End' ? 'skills' : id === 'about' ? 'skills' : 'about';
-                setProfileTab(next); document.getElementById('tab-' + next)?.focus();
-              }
-            }}>{id === 'about' ? <Layers size={14} /> : <Code2 size={14} />}{label}</button>)}
+            {tabs.map(({ id, label, Icon }, index) => (
+              <button key={id} id={`tab-${id}`} role="tab" aria-selected={profileTab === id}
+                aria-controls={`panel-${id}`} tabIndex={profileTab === id ? 0 : -1}
+                onClick={() => setProfileTab(id)} onKeyDown={event => {
+                  const targets = {
+                    ArrowLeft: (index + tabs.length - 1) % tabs.length,
+                    ArrowRight: (index + 1) % tabs.length,
+                    Home: 0,
+                    End: tabs.length - 1,
+                  };
+                  if (!Object.hasOwn(targets, event.key)) return;
+                  event.preventDefault();
+                  const next = tabs[targets[event.key]].id;
+                  setProfileTab(next);
+                  document.getElementById(`tab-${next}`)?.focus();
+                }}>
+                <Icon size={14} aria-hidden="true" />{label}
+              </button>
+            ))}
           </div>
 
           <div className="personal-panel">
@@ -41,18 +74,29 @@ export default function ProfileIntro({ username, profile, reduceMotion, projectC
               <p className="personal-intro">{personalProfile.intro}</p>
               <p className="personal-detail">{personalProfile.detail}</p>
               <div className="focus-grid" aria-label="Areas of expertise">
-                {[Layers, Gamepad2, Globe, Cpu].map((Icon, index) => <div key={personalProfile.areas[index]}><Icon size={17} /><span>{personalProfile.areas[index]}</span></div>)}
+                {[Code2, Gamepad2, Cpu, GraduationCap].map((Icon, index) => <div key={personalProfile.areas[index]}><Icon size={17} /><span>{personalProfile.areas[index]}</span></div>)}
               </div>
-            </div><div className="expertise-panel" id="panel-skills" role="tabpanel" aria-labelledby="tab-skills" tabIndex={0} hidden={profileTab !== "skills"}>
-              <p className="expertise-caption">PRIMARY LANGUAGES <span>Self-assessed</span></p>
-              {personalProfile.skills.map(skill => <div className="expertise-row" key={skill.name} style={{ '--skill-color': skill.color }}>
-                <span className="expertise-mark">{skill.mark}</span>
-                <div className="expertise-info"><h3>{skill.name}</h3><p>{skill.context}</p></div>
-                <span className="expertise-rating" role="img" aria-label={skill.name + ': ' + skill.rating + '/5 sao'}>
-                  <span className="rating-stars" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <Star key={index} size={12} className={index < skill.rating ? 'is-filled' : 'is-empty'} />)}</span>
-                  </span>
-              </div>)}
-              <p className="embedded-note"><Cpu size={14} /><span><strong>Embedded systems</strong> · Additional knowledge</span></p>
+              <p className="personal-detail">{personalProfile.education}</p>
+              <p className="personal-detail">
+                {personalProfile.english} · {personalProfile.location} · <a href={`mailto:${personalProfile.email}`}>Email me</a>
+              </p>
+            </div>
+            <div className="expertise-panel" id="panel-skills" role="tabpanel" aria-labelledby="tab-skills" tabIndex={0} hidden={profileTab !== "skills"}>
+              {personalProfile.skills.map(skill => (
+                <div className="expertise-row" key={skill.name} style={{ "--skill-color": skill.color }}>
+                  <span className="expertise-mark" aria-hidden="true">{skill.mark}</span>
+                  <div className="expertise-info"><h3>{skill.name}</h3><p>{skill.context}</p></div>
+                </div>
+              ))}
+            </div>
+            <div id="panel-work" role="tabpanel" aria-labelledby="tab-work" tabIndex={0} hidden={profileTab !== "work"}>
+              <h3 className="expertise-caption">WORK EXPERIENCE</h3>
+              <ProfileEntries entries={personalProfile.experience} />
+              <h3 className="expertise-caption">SELECTED PROJECTS</h3>
+              <ProfileEntries entries={personalProfile.projects} />
+            </div>
+            <div id="panel-awards" role="tabpanel" aria-labelledby="tab-awards" tabIndex={0} hidden={profileTab !== "awards"}>
+              <ProfileEntries entries={personalProfile.awards} />
             </div>
           </div>
           <div className="personal-footer">
