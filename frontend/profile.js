@@ -1,5 +1,5 @@
 export const personalProfile = {
-  name: "Nguyễn Hoàng Tùng",
+  name: "HwangT",
   role: "Software Developer and STEM & AI Robotics Coach",
   intro: "I build software and games, teach programming, and coach student robotics teams for national and international competitions.",
   detail: "My work spans mobile game releases, robot motion control, sensor calibration, and competition strategy.",
