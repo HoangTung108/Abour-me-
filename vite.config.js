@@ -7,8 +7,12 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: { "/api": "http://127.0.0.1:8787" },
+    fs: {
+      deny: [".env", ".env.*", "*.env", "*.{crt,pem}", "**/.git/**", "**/backend/**"],
+    },
   },
   build: {
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks(id) {
