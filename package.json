@@ -6,9 +6,7 @@
   "scripts": {
     "dev": "vite --config ./vite.config.js --host 0.0.0.0 frontend",
     "build": "vite build frontend --config ./vite.config.js --outDir ../dist --emptyOutDir",
-    "preview": "vite preview --config ./vite.config.js --host 0.0.0.0",
-    "start": "node backend/server.js",
-    "test": "node --test"
+    "start": "node backend/server.js"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.5",
