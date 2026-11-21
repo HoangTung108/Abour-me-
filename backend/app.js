@@ -41,7 +41,7 @@ function parseProject(body) {
   };
 }
 
-export function createApp({ pool, apiToken }) {
+export function createApp({ projects, apiToken }) {
   const app = express();
   const clients = new Set();
   const tokenHash = createHash("sha256").update(apiToken).digest();
@@ -52,8 +52,7 @@ export function createApp({ pool, apiToken }) {
   });
 
   app.get("/api/projects", async (_request, response) => {
-    const result = await pool.query("SELECT id, url, name, description FROM portfolio_projects ORDER BY created_at, id");
-    response.json(result.rows.map(projectFromRow));
+    response.json((await projects.list()).map(projectFromRow));
   });
 
   app.get("/api/projects/events", (_request, response) => {
@@ -91,14 +90,12 @@ export function createApp({ pool, apiToken }) {
       return;
     }
     try {
-      const result = await pool.query(
-        "INSERT INTO portfolio_projects (id, url, name, description) VALUES ($1, $2, $3, $4) RETURNING id, url, name, description",
-        [randomUUID(), project.url, project.name, project.description],
-      );
+      project.id = randomUUID();
+      await projects.insert(project);
       for (const client of clients) client.write("data: sync\n\n");
-      response.status(201).json(projectFromRow(result.rows[0]));
+      response.status(201).json(projectFromRow(project));
     } catch (error) {
-      if (error.code === "23505") {
+      if (error.code === "23505" || error.code === 11000) {
         response.status(409).json({ error: "This project URL has already been added." });
         return;
       }
