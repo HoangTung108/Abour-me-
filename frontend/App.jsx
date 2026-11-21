@@ -14,6 +14,114 @@ const PROJECT_API_BASE = import.meta.env.VITE_PROJECT_API_BASE_URL ?? (window.lo
 
 export default function App() {
   const [showProjects, setShowProjects] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [githubRepositories, setGithubRepositories] = useState(repositorySnapshot);
+  const [addedProjects, setAddedProjects] = useState([]);
+  const [projectApiError, setProjectApiError] = useState(false);
+  const repositories = useMemo(() => {
+    const githubUrls = new Set(githubRepositories.map(repository => repository.html_url.replace(/\/$/, "").toLowerCase()));
+    return [...githubRepositories, ...addedProjects.filter(project => !githubUrls.has(project.html_url.replace(/\/$/, "").toLowerCase()))];
+  }, [githubRepositories, addedProjects]);
+  const [profile, setProfile] = useState(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('https://api.github.com/users/' + GITHUB_USERNAME, { signal: controller.signal })
+      .then(response => { if (!response.ok) throw new Error('Profile unavailable'); return response.json(); })
+      .then(setProfile).catch(() => { /* Local introduction remains available. */ });
+    return () => controller.abort();
+  }, []);
+  const [selectedRepository, setSelectedRepository] = useState(null);
+  const [previewRepository, setPreviewRepository] = useState(null);
+  const [loadError, setLoadError] = useState(false);
+  const reduceMotion = useReducedMotion();
+  const activeRepository = previewRepository || selectedRepository;
+  useEffect(() => {
+    const controller = new AbortController();
+    let storage;
+    try {
+      storage = window.localStorage;
+    } catch { /* Storage can be unavailable in private browsing. */ }
+    loadGithubRepositories({ username: GITHUB_USERNAME, storage, signal: controller.signal })
+      .then(({ repositories: data, error }) => {
+        setGithubRepositories(data);
+        setLoaded(true);
+        if (error) {
+          console.warn("Using saved GitHub projects:", error);
+          setLoadError(true);
+        }
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError") console.error("Could not load GitHub projects:", error);
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    if (PROJECT_API_BASE === null) return;
+    let controller;
+    let retryTimer;
+    const events = new EventSource(`${PROJECT_API_BASE}/api/projects/events`);
+    const refreshProjects = () => {
+      clearTimeout(retryTimer);
+      controller?.abort();
+      controller = new AbortController();
+      fetch(`${PROJECT_API_BASE}/api/projects`, { signal: controller.signal })
+        .then(response => {
+          if (!response.ok) throw new Error(`Project API returned ${response.status}`);
+          return response.json();
+        })
+        .then(data => {
+          if (!Array.isArray(data)) throw new Error("Invalid project API response");
+          setAddedProjects(data);
+          setProjectApiError(events.readyState !== EventSource.OPEN);
+        })
+        .catch(error => {
+          if (error.name !== "AbortError") {
+            console.error("Could not load added projects:", error);
+            setProjectApiError(true);
+            retryTimer = setTimeout(refreshProjects, 5000);
+          }
+        });
+    };
+    events.onmessage = refreshProjects;
+    events.onerror = () => setProjectApiError(true);
+    return () => {
+      controller?.abort();
+      clearTimeout(retryTimer);
+      events.close();
+    };
+  }, []);
+
+  const selectRepository = useCallback((repository) => {
+    setSelectedRepository((selected) => selected?.id === repository.id ? null : repository);
+  }, []);
+
+  const dismissRepository = useCallback(() => {
+    setSelectedRepository(null);
+    setPreviewRepository(null);
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") { dismissRepository(); setShowProjects(false); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [dismissRepository]);
+
+  function openRepository(repository) {
+    let url;
+    try {
+      url = new URL(repository.html_url);
+    } catch {
+      return;
+    }
+    if (url.protocol === "https:" || url.protocol === "http:") {
+      window.open(url.href, "_blank", "noopener,noreferrer");
+    }
+  }
+
   function selectFromDrawer(repository) {
     selectRepository(repository);
     setShowProjects(false);
@@ -28,7 +136,7 @@ export default function App() {
             selectedRepository={selectedRepository}
             previewRepository={previewRepository}
             reduceMotion={reduceMotion}
-            onSelect={selectRepository}
+            onSelect={openRepository}
             onPreview={setPreviewRepository}
             onDismiss={dismissRepository}
           />
