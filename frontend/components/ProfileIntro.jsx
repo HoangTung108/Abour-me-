@@ -78,7 +78,7 @@ export default function ProfileIntro({ username, reduceMotion, projectCount, loa
               </div>
               <p className="personal-detail">{personalProfile.education}</p>
               <p className="personal-detail">
-                {personalProfile.english} · {personalProfile.location} · <a href={`mailto:${personalProfile.email}`}>Email me</a>
+                {personalProfile.location} · <a href={`mailto:${personalProfile.email}`}>Email me</a>
               </p>
             </div>
             <div className="expertise-panel" id="panel-skills" role="tabpanel" aria-labelledby="tab-skills" tabIndex={0} hidden={profileTab !== "skills"}>

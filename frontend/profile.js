@@ -5,7 +5,6 @@ export const personalProfile = {
   detail: "My work spans mobile game releases, robot motion control, sensor calibration, and competition strategy.",
   areas: ["Software", "Games", "Robotics", "Coaching"],
   education: "Information Technology, University of Engineering and Technology, Vietnam National University, Hanoi (2021–2025)",
-  english: "IELTS 6.5",
   location: "Hanoi, Vietnam",
   email: "warbat082003@gmail.com",
   skills: [
